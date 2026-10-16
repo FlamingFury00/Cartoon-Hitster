@@ -25,6 +25,8 @@
 
   let flipped = $state(false);
   let landed = $state(false);
+  /** After the slam, the stamp moves to the corner so year and title stay readable. */
+  let settled = $state(false);
   let tension = $state(false);
   let confetti = $state(0);
   let guess = $state<E.Guess>({ cartoon: false, performer: false });
@@ -45,6 +47,8 @@
   const showGuess = $derived(!outcome.bought && (game.settings.tokens || pro));
   const tokensNow = $derived(coop && game.team ? game.team.tokens : active.tokens);
 
+  const calm = () => prefersReducedMotion() || app.settings.motion === 'reduced';
+
   function land() {
     if (landed) return;
     flipped = true;
@@ -54,12 +58,14 @@
         landed = true;
         app.revealLanded();
         if (outcome.bought || outcome.placementCorrect || outcome.stolenBy) confetti++;
+        if (calm()) settled = true;
+        else timers.push(setTimeout(() => (settled = true), 1300));
       }, 420),
     );
   }
 
   onMount(() => {
-    if (prefersReducedMotion() || app.settings.motion === 'reduced' || outcome.bought) {
+    if (calm() || outcome.bought) {
       timers.push(setTimeout(land, outcome.bought ? 300 : 50));
     } else {
       timers.push(
@@ -89,7 +95,7 @@
     <button class="cardbtn" class:tension aria-label={landed ? 'Carta rivelata' : 'Rivela subito'} onclick={land} in:scale={{ duration: 350, start: 0.6 }}>
       <BigCard song={s} {flipped} />
       {#if landed}
-        <div class="stamp {verdict.cls}" in:scale={{ duration: 420, start: 2.6 }}>{verdict.text}</div>
+        <div class="stamp {verdict.cls}" class:settled in:scale={{ duration: calm() ? 0 : 420, start: 2.6 }}>{verdict.text}</div>
       {/if}
     </button>
 
@@ -201,6 +207,15 @@
     box-shadow: 0 6px 0 var(--ink);
     white-space: nowrap;
     pointer-events: none;
+    transition:
+      top 0.5s var(--ease-back),
+      left 0.5s var(--ease-back),
+      transform 0.5s var(--ease-back);
+  }
+  .stamp.settled {
+    top: 8%;
+    left: 74%;
+    transform: translate(-50%, -50%) rotate(10deg) scale(0.5);
   }
   .stamp.right {
     color: #15a33a;
