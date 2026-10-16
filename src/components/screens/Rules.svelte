@@ -40,7 +40,7 @@
     <ul>
       <li><b>Classica</b>: le regole qui sopra.</li>
       <li><b>Esperto</b>: per tenere la carta devi anche dire il nome del cartone.</li>
-      <li><b>Squadra</b>: tutti insieme su un'unica linea del tempo. Ogni errore costa un gettone della squadra; senza gettoni si perde.</li>
+      <li><b>Squadra</b>: tutti insieme su un'unica linea del tempo. La squadra parte con 5 gettoni: ogni errore ne costa uno, indovinare cartone e interprete ne fa guadagnare uno. Un errore senza gettoni fa perdere la partita.</li>
     </ul>
   </article>
 

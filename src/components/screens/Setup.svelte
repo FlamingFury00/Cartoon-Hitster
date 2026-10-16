@@ -2,7 +2,7 @@
   import { app } from '../../lib/app.svelte';
   import { songs } from '../../lib/deckdata';
   import { DECADES, filterDeck, minDeckSize, recommendedDeckSize, TAG_FILTERS } from '../../lib/game/deck';
-  import { MAX_PLAYERS } from '../../lib/game/engine';
+  import { DEFAULT_SETTINGS, MAX_PLAYERS } from '../../lib/game/engine';
   import type { Decade, GameMode, GameSettings, PlayerSetup } from '../../lib/game/types';
   import { loadRoster } from '../../lib/storage';
   import { AVATARS, FAME_INFO, MODE_INFO, PLAYER_COLORS } from '../../lib/ui-constants';
@@ -65,11 +65,19 @@
     sfx.pop();
   }
 
+  let tokensBeforeCoop: number | null = null;
+
   function setMode(m: GameMode) {
+    const wasCoop = s.mode === 'coop';
     s.mode = m;
-    if (m === 'coop') {
+    if (m === 'coop' && !wasCoop) {
+      // As in Hitster's co-op rules the team starts with 5 tokens: 2 would end most games in a few turns.
       s.tokens = true;
-      if (s.startTokens < 1) s.startTokens = 3;
+      tokensBeforeCoop = s.startTokens;
+      s.startTokens = 5;
+    } else if (m !== 'coop' && wasCoop) {
+      s.startTokens = tokensBeforeCoop ?? DEFAULT_SETTINGS.startTokens;
+      tokensBeforeCoop = null;
     }
     sfx.tap();
   }
