@@ -117,7 +117,7 @@ export type Phase =
   | { t: 'listen'; card: string; slot: number | null }
   | { t: 'challenge'; card: string; slot: number; challenges: Challenge[] }
   | { t: 'reveal'; card: string; slot: number | null; challenges: Challenge[]; outcome: RevealOutcome }
-  | { t: 'over'; reason: 'target' | 'deck' | 'coop-won' | 'coop-lost'; winners: string[] };
+  | { t: 'over'; reason: 'target' | 'deck' | 'ended' | 'coop-won' | 'coop-lost'; winners: string[] };
 
 /** One resolved turn, kept for statistics and the end-of-game summary. */
 export interface TurnRecord {

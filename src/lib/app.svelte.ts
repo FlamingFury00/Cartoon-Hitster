@@ -46,6 +46,8 @@ class App {
   menuOpen = $state(false);
   private undoStack: GameState[] = [];
   canUndo = $state(false);
+  /** Card whose preview is currently playing (or loading). */
+  private playingCard: string | null = null;
 
   constructor() {
     this.applySettings();
@@ -70,7 +72,7 @@ class App {
       this.screen = screen;
     }
     if (screen !== 'game') {
-      player.stop();
+      this.stopMusic();
       keepAwake(false);
     }
   }
@@ -84,13 +86,18 @@ class App {
     }
     this.screen = state?.screen ?? 'home';
     if (this.screen !== 'game') {
-      player.stop();
+      this.stopMusic();
       keepAwake(false);
     }
   }
 
   back() {
     history.back();
+  }
+
+  private stopMusic() {
+    this.playingCard = null;
+    player.stop();
   }
 
   // ---------------------------------------------------------------- settings
@@ -187,6 +194,7 @@ class App {
       openExternal(spotifyUrl(s));
       return;
     }
+    this.playingCard = card;
     player.play(s).then(
       () => this.preloadAhead(),
       () => {
@@ -329,7 +337,7 @@ class App {
         haptics.coin();
       }
       if (next.phase.t === 'intro') {
-        player.stop();
+        this.stopMusic();
         sfx.turn();
         this.preloadAhead();
       }
@@ -344,7 +352,10 @@ class App {
     this.revealing = prev.phase.t === 'reveal';
     store.saveGame(prev);
     this.menuOpen = false;
-    if (prev.phase.t !== 'listen') player.stop();
+    this.audioError = null;
+    if (prev.phase.t !== 'listen') this.stopMusic();
+    // Undoing a skip brings back the previous song: play it again.
+    else if (this.playingCard !== prev.phase.card) this.playCard(prev.phase.card);
     toast('Ultima mossa annullata');
   }
 
@@ -362,7 +373,7 @@ class App {
     this.canUndo = false;
     this.revealing = false;
     store.saveGame(null);
-    player.stop();
+    this.stopMusic();
     keepAwake(false);
   }
 
@@ -409,7 +420,7 @@ class App {
     });
     if (g.phase.reason === 'coop-lost') {
       sfx.wrong();
-    } else {
+    } else if (g.phase.winners.length || g.phase.reason === 'coop-won') {
       setTimeout(() => sfx.fanfare(), 250);
       haptics.win();
     }

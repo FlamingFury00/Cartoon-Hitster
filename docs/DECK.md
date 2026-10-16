@@ -14,7 +14,8 @@ lo spiega (per esempio "Sigla delle repliche di Lady Oscar").
 Come sono stati verificati gli anni:
 
 1. **Fino al 1990**: anno di pubblicazione del 45 giri o dell'album (Fivelandia, Cristina D'Avena e i tuoi amici
-   in TV…) dalle voci di it.wikipedia sui singoli e sulle discografie.
+   in TV…) dalle voci di it.wikipedia sui singoli e sulle discografie, confrontato con la prima TV italiana della
+   serie; quando i due anni non coincidono si è verificato quale sigla andò in onda (Tana delle sigle).
 2. **Dal 1991**: gli elenchi delle canzoni riportano l'anno di **deposito SIAE**, che può precedere la messa in onda.
    Ogni anno è stato confrontato con la data della prima TV italiana (infobox delle voci sulle serie) e con l'album
    in cui la sigla è uscita: se la serie è arrivata in TV dopo il deposito, vale la prima TV.
@@ -56,7 +57,7 @@ normalizzato (EBU R128) carta per carta.
 | 022 | 1980 | La principessa Sapphire | La principessa Zaffiro | I Cavalieri di Silverland | ⭐⭐ | it.wikipedia: La principessa Sapphire/La principessa Sapphire (strumentale) | [Deezer](https://www.deezer.com/track/75372615) · [Spotify](https://open.spotify.com/track/6n2PYojKo6tBaQEySUF251) |
 | 023 | 1980 | Pinocchio perché no? | Le nuove avventure di Pinocchio | Luigi Lopez | ⭐ | it.wikipedia: Pinocchio perché no?/La canzone di Paul | [Deezer](https://www.deezer.com/track/3221292391) · [Spotify](https://open.spotify.com/track/7K5c7TIjqnNyUm7aukcVye) |
 | 024 | 1980 | Peline Story | Peline Story | Georgia Lepore | ⭐ | it.wikipedia: Peline Story/Ciao Lassie | [Deezer](https://www.deezer.com/track/3221292341) · [Spotify](https://open.spotify.com/track/1DcpKIFIZ6skMxIAb4PBok) |
-| 026 | 1980 | Tekkaman | Tekkaman | Micronauti | ⭐⭐ | it.wikipedia: Tekkaman/Il cavaliere dello spazio | [Deezer](https://www.deezer.com/track/75372611) · [Spotify](https://open.spotify.com/track/0Gu1Ll3INUMLiRDehRqqCK) |
+| 026 | 1980 | Tekkaman _(Seconda sigla italiana della serie)_ | Tekkaman | Micronauti | ⭐⭐ | it.wikipedia: Tekkaman/Il cavaliere dello spazio | [Deezer](https://www.deezer.com/track/75372611) · [Spotify](https://open.spotify.com/track/0Gu1Ll3INUMLiRDehRqqCK) |
 | 027 | 1980 | Monkey | The Monkey | I Coccodrilli | ⭐ | it.wikipedia: Monkey/Monkey (strumentale) | [Deezer](https://www.deezer.com/track/75372629) · [Spotify](https://open.spotify.com/track/7zFHckN6AyaFWiIJj21CE0) |
 | 029 | 1981 | Conan _(Prima sigla italiana della serie)_ | Conan il ragazzo del futuro | Georgia Lepore | ⭐⭐ | it.wikipedia: Conan/Fiordiligi | [Deezer](https://www.deezer.com/track/3221292631) · [Spotify](https://open.spotify.com/track/4n3i3AZfoGtMOSWOo7FcsL) |
 | 030 | 1981 | Cybernella | Cybernella | I Vianella | ⭐ | it.wikipedia: Con te bambino/Cybernella | [Deezer](https://www.deezer.com/track/3221292091) · [Spotify](https://open.spotify.com/track/5QW99vadVEAbeiRtJk1gpA) |
@@ -67,9 +68,9 @@ normalizzato (EBU R128) carta per carta.
 | 037 | 1981 | Trider G7 | L'invincibile robot Trider G7 | Superobots | ⭐⭐ | it.wikipedia: Trider G7/Tamagon risolvetutto | [Deezer](https://www.deezer.com/track/3221292281) · [Spotify](https://open.spotify.com/track/7GEjO244d7GqBm7Zjbz2Xf) |
 | 038 | 1981 | La spada di King Arthur | La spada di King Arthur | I Cavalieri del Re | ⭐ | it.wikipedia: La spada di King Arthur/Blue Noah | [Deezer](https://www.deezer.com/track/3221292161) · [Spotify](https://open.spotify.com/track/0SCop7yoxG8SRn7KhorMAg) |
 | 039 | 1981 | Lulù | Lulù l'angelo tra i fiori | Rocking Horse | ⭐⭐ | it.wikipedia: Lulù/Toriton | [Deezer](https://www.deezer.com/track/3221292171) · [Spotify](https://open.spotify.com/track/0uatF2VCbUdymZDFG8ewdb) |
-| 041 | 1981 | Bambino Pinocchio | Pinocchio | Cristina D'Avena | ⭐⭐ | it.wikipedia: Brani musicali di Cristina D'Avena | [Deezer](https://www.deezer.com/track/2909701161) |
 | 043 | 1981 | Starzinger | Starzinger | Superobots | ⭐ | it.wikipedia: Koseidon/Starzinger | [Deezer](https://www.deezer.com/track/3221292361) · [Spotify](https://open.spotify.com/track/445VjFSLy9bhc0LZ6O4iPQ) |
 | 044 | 1981 | Supercar Gattiger | Supercar Gattiger | Superobots | ⭐ | it.wikipedia: Supercar Gattiger/Mysha | [Deezer](https://www.deezer.com/track/3221292211) · [Spotify](https://open.spotify.com/track/4zqumPdj3tJ3ZwWCPeYeTZ) |
+| 041 | 1982 | Bambino Pinocchio | Pinocchio | Cristina D'Avena | ⭐⭐ | prima TV della serie dal 18 gennaio 1982; 45 giri inizio 1982 (deposito giugno 1982) | [Deezer](https://www.deezer.com/track/2909701161) |
 | 045 | 1982 | Babil Junior | Babil Junior | Superobots | ⭐ | it.wikipedia: Babil Junior/Lalabel | [Deezer](https://www.deezer.com/track/3221292721) · [Spotify](https://open.spotify.com/track/02VBHhRBhDCMiwRVKblwiy) |
 | 046 | 1982 | Belle et Sebastien | Belle e Sebastien | Fabiana Cantini | ⭐⭐ | it.wikipedia: Belle et Sebastien (singolo) | [Deezer](https://www.deezer.com/track/3221292051) · [Spotify](https://open.spotify.com/track/6D01t0dNb244i5bCctErtq) |
 | 047 | 1982 | Il gatto Doraemon | Doraemon | Oliver Onions | ⭐⭐ | it.wikipedia: Il gatto Doraemon/La canzone di Doraemon | [Deezer](https://www.deezer.com/track/3221292241) · [Spotify](https://open.spotify.com/track/1vRpvgnPSNTuoq1kui4CHY) |

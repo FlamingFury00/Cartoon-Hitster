@@ -23,6 +23,7 @@
   const title = $derived.by(() => {
     if (reason === 'coop-won') return 'La squadra ha vinto!';
     if (reason === 'coop-lost') return 'Peccato, la squadra ha perso!';
+    if (reason === 'ended' && coop) return 'Partita terminata';
     if (winners.length > 1) return 'Pareggio!';
     return `Vince ${winners[0]?.name ?? ''}!`;
   });
@@ -30,6 +31,7 @@
     if (reason === 'coop-won') return `${game.team?.timeline.length} sigle messe in fila insieme 🎉`;
     if (reason === 'coop-lost') return 'Gettoni finiti: riprovate, la prossima è quella buona!';
     if (reason === 'deck') return 'Il mazzo è finito: vince chi ha più carte.';
+    if (reason === 'ended') return coop ? `${game.team?.timeline.length} sigle messe in fila insieme` : 'Partita terminata: vince chi ha più carte.';
     if (winners.length > 1) return `Vincono ${winners.map((w) => w.name).join(' e ')}`;
     return `${winners[0]?.timeline.length} sigle in fila!`;
   });

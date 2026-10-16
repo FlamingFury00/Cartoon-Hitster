@@ -490,9 +490,8 @@ export function resolveTurn(state: GameState, songs: SongLookup, guess: Guess): 
   return touch(s);
 }
 
-/** Ends the game early (players stop): the leaders win. */
+/** The players stop early: whoever has the most cards wins (no winner in co-op). */
 export function abandonGame(state: GameState): GameState {
   const s = clone(state);
-  if (s.team) return endGame(s, 'coop-lost', []);
-  return endGame(s, 'deck', leaders(s).map((p) => p.id));
+  return endGame(s, 'ended', s.team ? [] : leaders(s).map((p) => p.id));
 }

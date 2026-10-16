@@ -61,7 +61,7 @@
           </header>
           <p class="winner">
             {#if e.mode === 'coop'}
-              {e.reason === 'coop-won' ? '🎉 Squadra vincente' : '💔 Squadra sconfitta'} · {e.team?.cards ?? 0} carte
+              {e.reason === 'coop-won' ? '🎉 Squadra vincente' : e.reason === 'ended' ? '🏁 Partita terminata' : '💔 Squadra sconfitta'} · {e.team?.cards ?? 0} carte
             {:else}
               🏆 {e.winners.join(' e ') || '—'}
             {/if}

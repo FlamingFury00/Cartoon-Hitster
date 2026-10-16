@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  abandonGame,
   addChallenge,
   activePlayer,
   activeTimeline,
@@ -288,6 +289,16 @@ describe('modes and endings', () => {
     s = drawCard(s);
     s = resolveTurn(confirmPlacement(setSlot(s, slotFor(s, false)), lookup), lookup, { cartoon: false, performer: false });
     expect(s.phase).toEqual({ t: 'over', reason: 'coop-lost', winners: [] });
+  });
+
+  it('ending the game early lets the leaders win (nobody in co-op)', () => {
+    let s = start({ tokens: false });
+    s = drawCard(s);
+    s = resolveTurn(confirmPlacement(setSlot(s, slotFor(s, true)), lookup), lookup, { cartoon: false, performer: false });
+    const ended = abandonGame(s);
+    expect(ended.phase).toEqual({ t: 'over', reason: 'ended', winners: ['p1'] });
+    const coop = abandonGame(start({ mode: 'coop' }));
+    expect(coop.phase).toEqual({ t: 'over', reason: 'ended', winners: [] });
   });
 
   it('ends the game when the deck runs out, leaders win', () => {
