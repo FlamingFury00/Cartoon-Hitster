@@ -46,7 +46,7 @@
     </div>
   </nav>
 
-  <footer class="foot">Musica in anteprima da Deezer e iTunes · nessun account richiesto</footer>
+  <footer class="foot">Musica in anteprima da Deezer e Spotify · nessun account richiesto</footer>
 </div>
 
 <style>

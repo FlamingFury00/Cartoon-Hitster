@@ -3,9 +3,20 @@
 
   let { game, onPick }: { game: GameState; onPick?: (playerId: string) => void } = $props();
   const target = $derived(game.settings.target);
+  let board: HTMLDivElement | undefined = $state();
+
+  // With 5-6 players the chips overflow on narrow phones: keep the active one in view.
+  $effect(() => {
+    const active = game.active;
+    const el = board?.querySelectorAll<HTMLElement>('.pl')[active];
+    if (!board || !el) return;
+    const left = el.getBoundingClientRect().left - board.getBoundingClientRect().left + board.scrollLeft;
+    const goal = left - (board.clientWidth - el.offsetWidth) / 2;
+    board.scrollTo({ left: Math.max(0, goal), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  });
 </script>
 
-<div class="board" aria-label="Classifica">
+<div class="board" aria-label="Classifica" bind:this={board}>
   {#if game.team}
     <div class="team">
       <span class="tava">🤝</span>

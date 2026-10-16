@@ -264,6 +264,19 @@ describe('modes and endings', () => {
     expect(s.phase.t === 'over' && s.phase.winners).toEqual(['p1', 'p2', 'p3']);
   });
 
+  it('can start from any player, and equal turns closes the round before that player', () => {
+    let s = newGame({ players, settings: settings({ target: 3, tokens: false, equalTurns: true }), songs, seed: 7, now: 1, firstPlayer: 2 });
+    expect(activePlayer(s).id).toBe('p3');
+    const order: string[] = [];
+    while (s.phase.t !== 'over') {
+      order.push(activePlayer(s).id);
+      s = drawCard(s);
+      s = resolveTurn(confirmPlacement(setSlot(s, slotFor(s, true)), lookup), lookup, { cartoon: false, performer: false });
+    }
+    expect(order).toEqual(['p3', 'p1', 'p2', 'p3', 'p1', 'p2']);
+    expect(s.phase.t === 'over' && s.phase.winners).toEqual(['p1', 'p2', 'p3']);
+  });
+
   it('co-op: shared timeline, wrong answers cost lives, the team can lose', () => {
     let s = start({ mode: 'coop', startTokens: 1 });
     expect(s.team?.timeline).toHaveLength(1);

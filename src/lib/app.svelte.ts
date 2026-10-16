@@ -17,10 +17,27 @@ function toast(msg: string, kind: 'info' | 'warn' = 'info') {
   app.toasts = [...app.toasts, { id: Date.now() + Math.random(), msg, kind }];
 }
 
+/** The saved game, unless it refers to cards that are not in this version's deck. */
+function restoreGame(): GameState | null {
+  const g = store.loadGame();
+  if (!g) return null;
+  const phase = g.phase as { card?: string };
+  const ids = [
+    ...g.players.flatMap((p) => p.timeline),
+    ...(g.team?.timeline ?? []),
+    ...g.deck,
+    ...g.discard,
+    ...(phase.card ? [phase.card] : []),
+  ];
+  if (ids.every((id) => songsById.has(id))) return g;
+  store.saveGame(null);
+  return null;
+}
+
 class App {
   screen = $state<Screen>('home');
   settings = $state<store.AppSettings>(store.loadSettings());
-  game = $state.raw<GameState | null>(store.loadGame());
+  game = $state.raw<GameState | null>(restoreGame());
   toasts = $state<{ id: number; msg: string; kind: 'info' | 'warn' }[]>([]);
   /** Audio problem for the card being played (shown with a "draw another" button). */
   audioError = $state<string | null>(null);
@@ -116,9 +133,9 @@ class App {
     }
   }
 
-  newGame(players: PlayerSetup[], settings: GameSettings) {
+  newGame(players: PlayerSetup[], settings: GameSettings, firstPlayer = 0) {
     this.guard(() => {
-      const g = E.newGame({ players, settings, songs, freshness: store.beginGameFreshness() });
+      const g = E.newGame({ players, settings, songs, firstPlayer, freshness: store.beginGameFreshness() });
       this.undoStack = [];
       this.canUndo = false;
       this.settings.game = settings;
@@ -353,10 +370,14 @@ class App {
     const g = this.game;
     if (!g) return;
     const players = g.players.map((p) => ({ name: p.name, avatar: p.avatar, color: p.color }));
-    // The previous loser starts: rotate so the last player in the ranking goes first.
+    // Whoever collected the fewest cards takes the first turn of the rematch.
+    let first = 0;
+    g.players.forEach((p, i) => {
+      if (p.timeline.length < g.players[first].timeline.length) first = i;
+    });
     const settings = g.settings;
     this.closeGame();
-    this.newGame(players, settings);
+    this.newGame(players, settings, g.team ? 0 : first);
   }
 
   private finish(g: GameState) {

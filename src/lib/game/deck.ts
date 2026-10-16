@@ -18,8 +18,9 @@ export function decadeOf(year: number): Decade {
 export const TAG_FILTERS: { tag: string; label: string; emoji: string }[] = [
   { tag: 'cristina', label: "Cristina D'Avena", emoji: '👑' },
   { tag: 'vanni', label: 'Giorgio Vanni', emoji: '🎸' },
-  { tag: 'rai', label: 'Classici anni 70–80', emoji: '📺' },
   { tag: 'robot', label: 'Super robot', emoji: '🤖' },
+  { tag: 'magia', label: 'Maghette', emoji: '🪄' },
+  { tag: 'sport', label: 'Sport', emoji: '⚽' },
   { tag: 'anime', label: 'Anime giapponesi', emoji: '🗾' },
   { tag: 'western', label: 'Cartoni occidentali', emoji: '🌍' },
 ];

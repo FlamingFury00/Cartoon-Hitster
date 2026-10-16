@@ -77,7 +77,7 @@
       <div class="opt col">
         <div><strong>Sorgente preferita</strong><small>Se una non funziona si passa all'altra</small></div>
         <div class="seg three" role="radiogroup" aria-label="Sorgente audio">
-          {#each [['auto', 'Automatica'], ['deezer', 'Deezer'], ['itunes', 'iTunes'], ['spotify', 'Spotify']] as [v, l] (v)}
+          {#each [['auto', 'Automatica'], ['deezer', 'Deezer'], ['spotify', 'Spotify']] as [v, l] (v)}
             <button role="radio" aria-checked={app.settings.source === v} onclick={() => ((app.settings.source = v as typeof app.settings.source), save())}>{l}</button>
           {/each}
         </div>
@@ -109,7 +109,7 @@
       Contiene {songs.length} sigle curate a mano con l'anno della prima uscita italiana.
     </p>
     <p class="small">
-      Audio: anteprime pubbliche di Deezer e Apple iTunes, riprodotte in streaming. Nessun brano è incluso nell'app.
+      Audio: anteprime pubbliche di Deezer e Spotify, riprodotte in streaming. Nessun brano è incluso nell'app.
       {isAndroidApp ? 'Versione Android.' : 'Versione web: puoi installarla dal menu del browser ("Aggiungi a schermata Home").'}
     </p>
     {#if !confirmReset}
@@ -181,7 +181,7 @@
     gap: 8px;
   }
   .seg.three {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
   .seg button {
     padding: 10px 8px;

@@ -56,7 +56,7 @@
   <article class="panel">
     <h2>🎧 L'audio</h2>
     <p>
-      Le sigle suonano direttamente nell'app grazie alle anteprime di 30 secondi di <b>Deezer</b> e <b>iTunes</b>:
+      Le sigle suonano direttamente nell'app grazie alle anteprime di 30 secondi di <b>Deezer</b> e <b>Spotify</b>:
       non serve nessun account. Dopo aver girato la carta puoi aprire la sigla completa su <b>Spotify</b>.
       Nelle impostazioni puoi anche scegliere di far partire ogni sigla direttamente nell'app Spotify (ma lì il titolo è visibile!).
     </p>

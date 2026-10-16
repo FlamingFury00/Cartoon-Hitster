@@ -1,0 +1,107 @@
+name: Release
+
+# Every push to main publishes:
+#  - the Android APK as a GitHub Release (download link: releases/latest/download/SigleInFila.apk)
+#  - the web version on GitHub Pages (needs Settings -> Pages -> Source: "GitHub Actions", once)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    name: Android APK release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - run: npm test
+      - run: npm run deck:validate
+      - name: Version
+        id: version
+        run: |
+          base=$(grep versionName android/version.properties | cut -d= -f2)
+          echo "name=${base%.*}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          # Minutes since 2025-01-01: always increasing, so every APK installs over the previous one.
+          echo "code=$(( ($(date +%s) - 1735689600) / 60 ))" >> "$GITHUB_OUTPUT"
+      - name: Build web assets for the app
+        run: npm run build:android
+      - name: Build release APK
+        working-directory: android
+        env:
+          SIF_VERSION_CODE: ${{ steps.version.outputs.code }}
+          SIF_VERSION_NAME: ${{ steps.version.outputs.name }}
+          SIF_KEYSTORE_BASE64: ${{ secrets.SIF_KEYSTORE_BASE64 }}
+          SIF_KEYSTORE_PASSWORD: ${{ secrets.SIF_KEYSTORE_PASSWORD }}
+          SIF_KEY_ALIAS: ${{ secrets.SIF_KEY_ALIAS }}
+          SIF_KEY_PASSWORD: ${{ secrets.SIF_KEY_PASSWORD }}
+        run: |
+          # Optional private signing key (repository secrets); otherwise the side-load key is used.
+          if [ -n "$SIF_KEYSTORE_BASE64" ]; then
+            echo "$SIF_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            export SIF_KEYSTORE="$RUNNER_TEMP/release.jks"
+          else
+            unset SIF_KEYSTORE_PASSWORD SIF_KEY_ALIAS SIF_KEY_PASSWORD
+          fi
+          ./gradlew assembleRelease --no-daemon
+      - name: Rename APK
+        run: mv android/app/build/outputs/apk/release/app-release.apk SigleInFila.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.name }}
+          name: Sigle in Fila ${{ steps.version.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: SigleInFila.apk
+          body: |
+            📱 **Installa su Android**: scarica `SigleInFila.apk` qui sotto dal telefono e aprilo
+            (la prima volta Android chiede di consentire l'installazione dal browser o dal file manager).
+            Le versioni successive si installano sopra questa, senza perdere partite e storico.
+
+            🌐 Versione web: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+
+            Commit: ${{ github.sha }}
+
+  pages:
+    name: Web version (GitHub Pages)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Pages must be enabled once in the repository settings; until then this job is skipped over.
+    continue-on-error: true
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

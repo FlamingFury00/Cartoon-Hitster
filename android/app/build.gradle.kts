@@ -7,10 +7,12 @@ plugins {
 // Release signing: CI can inject a private keystore through environment variables.
 // Without it, the APK is signed with the committed side-load key (android/sideload.jks),
 // so that updates installed from GitHub keep the same signature (no uninstall needed).
-val keystoreFile = System.getenv("SIF_KEYSTORE")?.let { file(it) } ?: rootProject.file("sideload.jks")
-val keystorePassword = System.getenv("SIF_KEYSTORE_PASSWORD") ?: "sigleinfila"
-val keyAliasName = System.getenv("SIF_KEY_ALIAS") ?: "sigleinfila"
-val keyPasswordValue = System.getenv("SIF_KEY_PASSWORD") ?: "sigleinfila"
+fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
+
+val keystoreFile = env("SIF_KEYSTORE")?.let { file(it) } ?: rootProject.file("sideload.jks")
+val keystorePassword = env("SIF_KEYSTORE_PASSWORD") ?: "sigleinfila"
+val keyAliasName = env("SIF_KEY_ALIAS") ?: "sigleinfila"
+val keyPasswordValue = env("SIF_KEY_PASSWORD") ?: "sigleinfila"
 
 val versionProps = Properties().apply {
     val f = rootProject.file("version.properties")
@@ -25,8 +27,8 @@ android {
         applicationId = "io.github.flamingfury00.sigleinfila"
         minSdk = 24
         targetSdk = 36
-        versionCode = (System.getenv("SIF_VERSION_CODE") ?: versionProps.getProperty("versionCode", "1")).toInt()
-        versionName = System.getenv("SIF_VERSION_NAME") ?: versionProps.getProperty("versionName", "1.0.0")
+        versionCode = (env("SIF_VERSION_CODE") ?: versionProps.getProperty("versionCode", "1")).toInt()
+        versionName = env("SIF_VERSION_NAME") ?: versionProps.getProperty("versionName", "1.0.0")
     }
 
     signingConfigs {
@@ -65,16 +67,21 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.activity:activity-ktx:1.13.0")
     implementation("androidx.webkit:webkit:1.17.1")
 }
 
 // The web app is built by Vite (npm run build:android) into ../dist-android and bundled
 // as assets/www, so the APK works offline (only the music previews need the network).
-val syncWebAssets by tasks.registering(Sync::class) {
-    from(rootProject.file("../dist-android"))
+val webDist: File = rootProject.file("../dist-android")
+val syncWebAssets = tasks.register<Sync>("syncWebAssets") {
+    from(webDist)
     into(layout.projectDirectory.dir("src/main/assets/www"))
+    doFirst {
+        check(webDist.resolve("index.html").isFile) {
+            "Web app not built: run `npm run build:android` in the repository root first."
+        }
+    }
 }
 tasks.named("preBuild") {
     dependsOn(syncWebAssets)

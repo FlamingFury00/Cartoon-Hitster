@@ -71,6 +71,8 @@ export interface NewGameOptions {
   seed?: number;
   /** 0..1 multiplier lowering the odds of songs heard in recent games. */
   freshness?: (id: string) => number;
+  /** Index of the player who takes the first turn (default: the first one). */
+  firstPlayer?: number;
   now?: number;
 }
 
@@ -122,6 +124,7 @@ export function newGame(opts: NewGameOptions): GameState {
   }));
 
   const now = opts.now ?? Date.now();
+  const first = Math.max(0, Math.min(n - 1, Math.trunc(opts.firstPlayer ?? 0)));
   return {
     v: 1,
     id: `g${now.toString(36)}${seed.toString(36)}`,
@@ -135,8 +138,8 @@ export function newGame(opts: NewGameOptions): GameState {
     deck: ordered.map((s) => s.id).reverse(),
     discard: [],
     turn: 0,
-    active: 0,
-    firstPlayer: 0,
+    active: first,
+    firstPlayer: first,
     phase: { t: 'intro' },
     history: [],
   };

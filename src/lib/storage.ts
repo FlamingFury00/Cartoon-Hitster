@@ -1,6 +1,7 @@
 // localStorage persistence (guarded: storage can be unavailable or full).
 import type { GameSettings, GameState, PlayerSetup } from './game/types';
 import { DEFAULT_SETTINGS } from './game/engine';
+import { DECADES, TAG_FILTERS } from './game/deck';
 import type { SourcePreference } from './audio/sources';
 
 const KEY = {
@@ -68,7 +69,20 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
 export function loadSettings(): AppSettings {
   const s = read<Partial<AppSettings>>(KEY.settings, {});
-  return { ...DEFAULT_APP_SETTINGS, ...s, game: { ...DEFAULT_SETTINGS, ...(s.game ?? {}) } };
+  return { ...DEFAULT_APP_SETTINGS, ...s, game: sanitizeGameSettings(s.game) };
+}
+
+/** Saved settings may come from an older version: keep only values this version understands. */
+function sanitizeGameSettings(g: Partial<GameSettings> | undefined): GameSettings {
+  const out: GameSettings = { ...DEFAULT_SETTINGS, ...(g ?? {}) };
+  const tags = new Set(TAG_FILTERS.map((t) => t.tag));
+  const decades = new Set<number>(DECADES.map((d) => d.value));
+  out.tags = Array.isArray(out.tags) ? out.tags.filter((t) => tags.has(t)) : [];
+  out.decades = Array.isArray(out.decades) ? out.decades.filter((d) => decades.has(d)) : [];
+  if (![1, 2, 3].includes(out.minFame)) out.minFame = DEFAULT_SETTINGS.minFame;
+  if (!['classic', 'pro', 'coop'].includes(out.mode)) out.mode = DEFAULT_SETTINGS.mode;
+  if (!Number.isInteger(out.target) || out.target < 3 || out.target > 30) out.target = DEFAULT_SETTINGS.target;
+  return out;
 }
 
 export function saveSettings(s: AppSettings) {

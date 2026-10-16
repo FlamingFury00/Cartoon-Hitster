@@ -1,7 +1,8 @@
 // Resolves a playable 30-second preview for a song, with no developer account:
 //  1. Deezer public API (JSONP) -> fresh signed preview URL (expires after ~15 minutes)
-//  2. iTunes preview URL stored in the deck (stable), refreshed through the iTunes lookup API
-// Both CDNs send `Access-Control-Allow-Origin: *`, so previews can be decoded with Web Audio.
+//  2. Spotify preview URL stored in the deck (stable, read from the public embed page)
+//  3. iTunes preview URL, when the deck has one (optional, refreshed through the lookup API)
+// All these CDNs send `Access-Control-Allow-Origin: *`, so previews can be decoded with Web Audio.
 import type { Song } from '../game/types';
 
 export type SourceKind = 'dz' | 'it' | 'sp';

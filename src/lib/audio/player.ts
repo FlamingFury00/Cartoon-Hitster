@@ -100,11 +100,12 @@ export class MusicPlayer {
     const fx = ctx.createGain();
     fx.gain.value = this.fxVolume;
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -6;
-    comp.knee.value = 6;
-    comp.ratio.value = 8;
-    comp.attack.value = 0.003;
-    comp.release.value = 0.25;
+    // Previews are loudness-normalised offline (tools/deck/loudness.mjs): this only limits peaks.
+    comp.threshold.value = -4;
+    comp.knee.value = 4;
+    comp.ratio.value = 12;
+    comp.attack.value = 0.002;
+    comp.release.value = 0.2;
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.78;

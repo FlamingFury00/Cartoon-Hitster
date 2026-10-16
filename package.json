@@ -12,11 +12,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "deck:build": "node tools/build-deck.mjs",
-    "deck:validate": "node tools/validate-deck.mjs",
+    "deck:build": "node tools/deck/build.mjs",
+    "deck:validate": "node tools/deck/validate.mjs",
     "build:android": "vite build --mode android --outDir dist-android",
     "apk": "npm run build:android && cd android && ./gradlew assembleRelease",
     "deck:match": "node tools/deck/match.mjs deck/songs.csv",
+    "deck:sources": "node tools/deck/sources.mjs deck/songs.csv",
+    "deck:loudness": "node tools/deck/loudness.mjs deck/songs.csv",
     "icons": "node tools/assets/render-icons.mjs"
   },
   "devDependencies": {
