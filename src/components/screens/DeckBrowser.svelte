@@ -80,7 +80,7 @@
   <ul class="list scroll">
     {#each filtered as s (s.id)}
       <li>
-        <TimelineCard song={s} />
+        <TimelineCard song={s} wrap />
         <div class="btns">
           <button class="icon-btn" aria-label={playing === s.id ? 'Ferma' : `Ascolta ${s.title}`} onclick={() => toggle(s)}>
             {#if playing === s.id && pstate === 'loading'}
@@ -175,9 +175,26 @@
     gap: 8px;
     align-items: center;
   }
+  /* Stacked, compact buttons on phones so the card keeps room for its title. */
   .btns {
     display: flex;
-    gap: 6px;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .btns .icon-btn {
+    width: 44px;
+    height: 36px;
+    border-radius: 12px;
+  }
+  @media (min-width: 480px) {
+    .btns {
+      flex-direction: row;
+      gap: 6px;
+    }
+    .btns .icon-btn {
+      width: 48px;
+      height: 48px;
+    }
   }
   .none {
     display: block !important;

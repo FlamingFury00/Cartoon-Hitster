@@ -57,7 +57,8 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 6px 12px;
+    /* room for the equalizer (or the badge) on the right */
+    padding: 6px 48px 6px 12px;
     min-width: 0;
   }
   strong {

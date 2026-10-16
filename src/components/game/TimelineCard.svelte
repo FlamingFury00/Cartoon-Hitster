@@ -6,10 +6,11 @@
     song,
     state = 'normal',
     compact = false,
-  }: { song: Song; state?: 'normal' | 'new' | 'right' | 'wrong' | 'stolen'; compact?: boolean } = $props();
+    wrap = false,
+  }: { song: Song; state?: 'normal' | 'new' | 'right' | 'wrong' | 'stolen'; compact?: boolean; wrap?: boolean } = $props();
 </script>
 
-<div class="tcard {state}" class:compact style:--dc={decadeColor(song.year)}>
+<div class="tcard {state}" class:compact class:wrap style:--dc={decadeColor(song.year)}>
   <div class="year">{song.year}</div>
   <div class="body">
     <div class="cartoon"><span class="emoji" aria-hidden="true">{song.emoji}</span>{song.cartoon}</div>
@@ -90,6 +91,15 @@
   }
   .title {
     font-style: italic;
+  }
+  /* Long names may use two lines (deck browser). */
+  .wrap .cartoon,
+  .wrap .meta {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
   .flag {
     margin-left: 4px;

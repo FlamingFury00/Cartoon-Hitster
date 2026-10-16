@@ -58,14 +58,22 @@
     challenger = challenger === id ? null : id;
   }
 
-  // Bring the chosen slot into view after a tap/drop.
-  $effect(() => {
-    const s = phase.slot;
-    if (s == null || !scroller) return;
+  function reveal(slot: number) {
     queueMicrotask(() => {
-      const el = scroller?.querySelector<HTMLElement>(`[data-slot="${s}"]`);
+      const el = scroller?.querySelector<HTMLElement>(`[data-slot="${slot}"]`);
       el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     });
+  }
+
+  // Bring the chosen slot into view after a tap/drop...
+  $effect(() => {
+    const s = phase.slot;
+    if (s != null && scroller) reveal(s);
+  });
+  // ...and the marker of the latest challenger.
+  $effect(() => {
+    const last = phase.t === 'challenge' ? phase.challenges[phase.challenges.length - 1] : undefined;
+    if (last && scroller) reveal(last.slot);
   });
 </script>
 

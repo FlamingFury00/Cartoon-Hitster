@@ -123,9 +123,9 @@
           <div class="guess">
             <p class="q">
               {#if pro && outcome.placementCorrect}
-                Ha detto il <b>cartone</b>? Serve per tenere la carta!
+                {coop ? 'Avete' : `${active.name} ha`} detto il <b>cartone</b>? Serve per tenere la carta!
               {:else}
-                Bonus 🪙: ha indovinato <b>cartone</b> e <b>interprete</b>?
+                Bonus 🪙: {coop ? 'avete' : `${active.name} ha`} indovinato <b>cartone</b> e <b>interprete</b>?
               {/if}
             </p>
             <div class="gchips">
