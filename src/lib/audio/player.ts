@@ -130,6 +130,16 @@ export class MusicPlayer {
   unlock(): void {
     const ctx = this.ensureContext();
     if (!ctx) return;
+    // iPhone: Web Audio is muted by the silent switch unless the page asks for a "playback"
+    // audio session (Safari 17+), like a music app does.
+    const nav = navigator as Navigator & { audioSession?: { type: string } };
+    if (nav.audioSession && nav.audioSession.type !== 'playback') {
+      try {
+        nav.audioSession.type = 'playback';
+      } catch {
+        /* not supported */
+      }
+    }
     if (ctx.state !== 'running') void ctx.resume().catch(() => {});
     try {
       const b = ctx.createBuffer(1, 1, 22050);
