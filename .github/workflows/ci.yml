@@ -1,7 +1,9 @@
 name: CI
 
+# Pull requests are checked on their merge commit; main is checked after every merge.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
