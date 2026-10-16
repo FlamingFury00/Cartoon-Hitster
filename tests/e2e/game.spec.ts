@@ -1,54 +1,11 @@
-import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
-import deck from '../../src/data/deck.json' with { type: 'json' };
-import { DEFAULT_SETTINGS, newGame } from '../../src/lib/game/engine';
+import { expect, test } from '@playwright/test';
 import { insertSorted, validSlotRange } from '../../src/lib/game/timeline';
-import type { GameState, Song } from '../../src/lib/game/types';
-
-const songs = deck.songs as Song[];
-const byId = new Map(songs.map((s) => [s.id, s]));
-const yearOf = (id: string) => byId.get(id)!.year;
-const tone = readFileSync(new URL('./fixtures/tone.mp3', import.meta.url));
-
-/** Every music request is answered locally: the tests never touch Deezer, Spotify or Apple. */
-async function mockMusic(page: Page) {
-  await page.route('https://api.deezer.com/**', async (route) => {
-    const url = new URL(route.request().url());
-    const id = url.pathname.split('/').pop();
-    const exp = Math.floor(Date.now() / 1000) + 900;
-    const body = JSON.stringify({ id: Number(id), readable: true, preview: `https://cdnt-preview.dzcdn.net/api/1/1/test/${id}.mp3?hdnea=exp=${exp}~acl=x` });
-    const cb = url.searchParams.get('callback');
-    await route.fulfill({ contentType: 'application/javascript', body: cb ? `${cb}(${body})` : body });
-  });
-  const audio = { contentType: 'audio/mpeg', body: tone, headers: { 'access-control-allow-origin': '*' } };
-  await page.route(/dzcdn\.net|p\.scdn\.co|audio-ssl\.itunes\.apple\.com/, (route) => route.fulfill(audio));
-  await page.route('https://itunes.apple.com/**', (route) => route.fulfill({ status: 404, body: '' }));
-}
-
-async function seed(page: Page, game: GameState | null, settings: Record<string, unknown> = {}) {
-  await page.addInitScript(
-    ([g, s]) => {
-      if (sessionStorage.getItem('seeded')) return;
-      sessionStorage.setItem('seeded', '1');
-      localStorage.clear();
-      if (g) localStorage.setItem('sif.game.v1', JSON.stringify(g));
-      localStorage.setItem('sif.settings.v1', JSON.stringify({ seenRules: true, ...s }));
-    },
-    [game, settings] as const,
-  );
-}
+import type { GameState } from '../../src/lib/game/types';
+import { byId, makeGame, mockMusic, seed, yearOf } from './helpers';
 
 /** A two-player game where Anna needs one more right card to win. */
 function almostWonGame(): { game: GameState; slot: number } {
-  const game = newGame({
-    players: [
-      { name: 'Anna', avatar: '🐱', color: '#ff4f9a' },
-      { name: 'Bruno', avatar: '🐶', color: '#2bc4ff' },
-    ],
-    settings: { ...DEFAULT_SETTINGS, target: 5, tokens: false, minFame: 1 },
-    songs,
-    seed: 20251016,
-  });
+  const game = makeGame({ target: 5, tokens: false });
   for (let i = 0; i < 3; i++) {
     const id = game.deck.shift()!;
     game.players[0].timeline = insertSorted(game.players[0].timeline, id, yearOf);
