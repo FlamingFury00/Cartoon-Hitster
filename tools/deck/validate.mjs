@@ -54,21 +54,52 @@ const years = new Set(deck.songs.map((s) => s.year));
 if (years.size < 30) warnings.push(`only ${years.size} distinct years`);
 
 if (online) {
-  let missing = 0;
-  for (const s of deck.songs.filter((x) => x.src.dz)) {
-    const res = await fetch(`https://api.deezer.com/track/${s.src.dz}`);
-    const t = await res.json();
-    if (t.error?.code === 4) {
-      await new Promise((r) => setTimeout(r, 5000));
-      continue;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function deezerOk(id) {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        const t = await (await fetch(`https://api.deezer.com/track/${id}`)).json();
+        if (t.error?.code === 4) {
+          await sleep(5000); // quota: retry the same track
+          continue;
+        }
+        return Boolean(t.preview) && t.readable !== false;
+      } catch {
+        await sleep(2000);
+      }
     }
-    if (!t.preview || t.readable === false) {
-      missing++;
-      warnings.push(`${s.id} "${s.title}": Deezer track ${s.src.dz} has no preview any more${s.src.spp || s.src.itp ? ' (fallback available)' : ''}`);
-    }
-    await new Promise((r) => setTimeout(r, 120));
+    return false;
   }
-  console.log(`Deezer previews missing: ${missing}`);
+  async function urlOk(url) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(url, { method: 'HEAD' });
+        if (res.ok) return true;
+        if (res.status === 403 || res.status === 404) return false;
+      } catch {
+        /* retry */
+      }
+      await sleep(1500);
+    }
+    return false;
+  }
+  let dzMissing = 0;
+  let spMissing = 0;
+  for (const s of deck.songs) {
+    const dz = s.src.dz ? await deezerOk(s.src.dz) : false;
+    const sp = s.src.spp ? await urlOk(s.src.spp) : false;
+    if (s.src.dz && !dz) {
+      dzMissing++;
+      warnings.push(`${s.id} "${s.title}": Deezer track ${s.src.dz} has no preview any more`);
+    }
+    if (s.src.spp && !sp) {
+      spMissing++;
+      warnings.push(`${s.id} "${s.title}": Spotify preview not reachable`);
+    }
+    if (!dz && !sp && !s.src.itp) errors.push(`${s.id} "${s.title}": no working preview at all`);
+    await sleep(120);
+  }
+  console.log(`Previews missing: Deezer ${dzMissing}, Spotify ${spMissing}`);
 }
 
 for (const w of warnings) console.warn(`warning: ${w}`);
