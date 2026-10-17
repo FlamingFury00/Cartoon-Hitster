@@ -9,20 +9,16 @@
 // loudness-matched and encoded as a small mono MP3, so the whole set is reproducible:
 //
 //   node tools/assets/sfx.mjs        (needs ffmpeg with libmp3lame and unzip; downloads go to .cache/sfx)
-import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { promisify } from 'node:util';
+import { SR, db, decode, download, encodeMp3, exists, loudness, peakOf, run } from './lib/audio.mjs';
 
-const run = promisify(execFile);
 const CACHE = path.resolve('.cache/sfx');
 const OUT = path.resolve('src/assets/sfx');
-const SR = 44100;
 const BITRATE = '96k';
 /** Sample peak ceiling of every file (dBFS): MP3 overshoot stays below full scale. */
 const PEAK_CEILING = -1;
-const UA = 'SigleInFila/1.0 (https://github.com/FlamingFury00/Cartoon-Hitster; sound effects build)';
 
 const KENNEY = 'https://kenney.nl/media/pages/assets';
 /** Zip packs: their sounds are referenced as "<pack>:<path inside the zip>". */
@@ -91,35 +87,6 @@ const SOUNDS = {
 
 // ------------------------------------------------------------------ sources
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function exists(file) {
-  try {
-    return (await stat(file)).size > 0;
-  } catch {
-    return false;
-  }
-}
-
-async function download(url, file) {
-  if (await exists(file)) return;
-  for (let attempt = 1; ; attempt++) {
-    let status = 0;
-    try {
-      const res = await fetch(url, { headers: { 'User-Agent': UA } });
-      status = res.status;
-      if (res.ok) {
-        await writeFile(file, Buffer.from(await res.arrayBuffer()));
-        return;
-      }
-    } catch {
-      /* connection dropped: retried below */
-    }
-    // Wikimedia answers 429 when downloads come too fast: wait and retry.
-    if (attempt >= 6 || (status && status !== 429 && status < 500)) throw new Error(`${url}: HTTP ${status || 'network error'}`);
-    await sleep(10000 * attempt);
-  }
-}
-
 /** Local path of a source reference, downloading (and unpacking) it on first use. */
 async function source(ref) {
   const [kind, name] = [ref.slice(0, ref.indexOf(':')), ref.slice(ref.indexOf(':') + 1)];
@@ -140,36 +107,6 @@ async function source(ref) {
 }
 
 // ------------------------------------------------------------------ audio helpers
-
-/** Decodes [from, to] of a file to mono float samples at SR. */
-async function decode(file, from = 0, to = null) {
-  const args = ['-v', 'error', '-ss', String(from), ...(to != null ? ['-t', String(to - from)] : []), '-i', file, '-vn', '-ac', '1', '-ar', String(SR), '-f', 'f32le', '-'];
-  const { stdout } = await run('ffmpeg', args, { encoding: 'buffer', maxBuffer: 256 * 1024 * 1024 });
-  return new Float32Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.byteLength));
-}
-
-/** Pipes samples into ffmpeg and returns its stderr. */
-function ffmpegFrom(samples, args) {
-  return new Promise((resolve, reject) => {
-    const p = spawn('ffmpeg', ['-hide_banner', '-nostats', '-f', 'f32le', '-ar', String(SR), '-ac', '1', '-i', 'pipe:0', ...args]);
-    let err = '';
-    p.stderr.on('data', (d) => (err += d));
-    p.on('error', reject);
-    p.on('close', (code) => (code === 0 ? resolve(err) : reject(new Error(`ffmpeg ${code}: ${err.slice(-400)}`))));
-    p.stdin.end(Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
-  });
-}
-
-/** Highest momentary loudness (LUFS). Silence around the sound lets the 400 ms window cover it. */
-async function loudness(x) {
-  const pad = Math.round(0.4 * SR);
-  const padded = new Float32Array(x.length + pad * 2);
-  padded.set(x, pad);
-  const log = await ffmpegFrom(padded, ['-af', 'ebur128', '-f', 'null', '-']);
-  let max = -Infinity;
-  for (const m of log.matchAll(/ M:\s*(-?[\d.]+|-inf)/g)) if (m[1] !== '-inf') max = Math.max(max, Number(m[1]));
-  return max;
-}
 
 /** 2nd-order Butterworth high-pass, run twice (24 dB/octave). */
 function highpass(x, hz) {
@@ -196,9 +133,6 @@ function highpass(x, hz) {
   }
   return y;
 }
-
-const peakOf = (x) => x.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
-const db = (g) => 20 * Math.log10(g);
 
 /** Cuts the silence before the attack (and after the sound, unless keepTail), then fades. */
 function trim(x, { keepTail = false, fadeIn = 0.002, fadeOut = 0.04 } = {}) {
@@ -243,7 +177,7 @@ function makeLoop(x, [a, b], fade = 0.12) {
 }
 
 async function render(v) {
-  const x = await decode(await source(v.src), v.from ?? 0, v.to ?? null);
+  const x = await decode(await source(v.src), { from: v.from ?? 0, to: v.to ?? null });
   const y = trim(v.hp ? highpass(x, v.hp) : x, v);
   return v.loop ? makeLoop(y, v.loop) : y;
 }
@@ -259,10 +193,6 @@ async function renderVariant(v) {
     for (let i = 0; i < x.length; i++) mix[off + i] += x[i] * g;
   }
   return mix;
-}
-
-async function encode(x, file) {
-  await ffmpegFrom(x, ['-v', 'error', '-c:a', 'libmp3lame', '-b:a', BITRATE, '-map_metadata', '-1', '-id3v2_version', '0', '-y', file]);
 }
 
 // ------------------------------------------------------------------ build
@@ -288,7 +218,7 @@ for (const [name, def] of Object.entries(SOUNDS)) {
     const file = def.variants.length > 1 ? `${name}-${i + 1}.mp3` : `${name}.mp3`;
     const gain = 10 ** ((target - lufs) / 20);
     const y = x.map((s) => s * gain);
-    await encode(y, path.join(OUT, file));
+    await encodeMp3(y, path.join(OUT, file), { bitrate: BITRATE });
     const size = (await stat(path.join(OUT, file))).size;
     rows.push({ file, seconds: +(y.length / SR).toFixed(2), kB: +(size / 1024).toFixed(1), lufs: +(await loudness(y)).toFixed(1), peak: +db(peakOf(y)).toFixed(1) });
     files.push(file);

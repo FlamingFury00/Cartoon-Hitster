@@ -41,10 +41,16 @@ test('every sound effect is bundled and decodes', async ({ page }) => {
   await seed(page, null);
   await page.goto('/');
   await page.getByRole('button', { name: /Nuova partita/ }).click();
-  const files = Object.values(manifest).flatMap((e) => e.files).length;
+  // Bundled as assets/<name>-<hash>.mp3 (next to the menu theme, which is not counted here).
+  const stems = Object.values(manifest).flatMap((e) => e.files.map((f) => f.replace(/\.mp3$/, '-')));
   await expect
-    .poll(() => page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/assets\/[^/]+\.mp3$/.test(e.name)).length))
-    .toBe(files);
+    .poll(() =>
+      page.evaluate(
+        (stems) => performance.getEntriesByType('resource').filter((e) => stems.some((s) => e.name.split('/').pop()!.startsWith(s))).length,
+        stems,
+      ),
+    )
+    .toBe(stems.length);
   expect(failed).toEqual([]);
   // The very first tap already has its sound (a "pop"), even though the audio was asleep.
   await expect.poll(async () => (await played(page)).map(effect)).toContain('pop');
@@ -72,6 +78,26 @@ test('a turn sounds like a game show: draw, place, drum roll, cymbal, verdict', 
   expect(names.indexOf('roll')).toBeLessThan(names.indexOf('crash'));
   expect(names.indexOf('crash')).toBeLessThan(verdict);
   expect((await played(page)).find((p) => effect(p) === 'roll')?.loop).toBe(true);
+});
+
+test('a card tapped before the drum roll still turns on a cymbal crash', async ({ page }) => {
+  await seed(page, makeGame({ tokens: false }));
+  await page.goto('/');
+  await page.getByRole('button', { name: /Riprendi la partita/ }).click();
+  await page.getByRole('button', { name: /Pesca la sigla/ }).click();
+  await expect(page.getByRole('button', { name: 'Pausa', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Metti la carta in questa posizione' }).first().click();
+  await page.getByRole('button', { name: /Conferma/ }).click();
+  // Right away, while the card is still growing in (the roll starts after 380 ms).
+  await page.getByRole('button', { name: 'Rivela subito' }).dispatchEvent('click');
+  await expect(page.getByRole('button', { name: /Avanti/ })).toBeVisible();
+
+  await expect.poll(async () => (await played(page)).map(effect)).toContain('crash');
+  const names = (await played(page)).map(effect).filter((n): n is string => n !== null);
+  const crash = names.indexOf('crash');
+  expect(names.findIndex((n) => n === 'correct' || n === 'wrong')).toBeGreaterThan(crash);
+  // No drum roll may start once the card has turned.
+  expect(names.slice(crash)).not.toContain('roll');
 });
 
 test('no sound effects when they are switched off', async ({ page }) => {

@@ -5,13 +5,16 @@ import type { GameSettings, GameState, PlayerSetup, Song } from './game/types';
 import { player } from './audio/player';
 import { preloadSfx, setSfxEnabled, sfx } from './audio/sfx';
 import { spotifyUrl } from './audio/sources';
+import { theme } from './audio/theme';
 import { songs, songsById } from './deckdata';
 import { haptics, keepAwake, openExternal, setHaptics } from './platform';
 import * as store from './storage';
 
-export type Screen = 'home' | 'setup' | 'game' | 'rules' | 'settings' | 'history' | 'deck';
+export type Screen = 'home' | 'setup' | 'game' | 'tutorial' | 'rules' | 'settings' | 'history' | 'deck';
 
 const UNDO_LIMIT = 12;
+/** Screens with the main theme playing (the game, the tutorial and the deck play songs). */
+const MENU_SCREENS = new Set<Screen>(['home', 'setup', 'rules', 'settings', 'history']);
 
 function toast(msg: string, kind: 'info' | 'warn' = 'info') {
   app.toasts = [...app.toasts, { id: Date.now() + Math.random(), msg, kind }];
@@ -49,22 +52,30 @@ class App {
   /** History entries pushed on top of the home screen (so "home" can unwind them all). */
   private depth = 0;
   private unwinding = false;
+  /** Rules or settings opened from a running game: the theme stays off there. */
+  private detour = false;
+  private themeQueued = false;
 
   constructor() {
     this.applySettings();
     if (typeof window !== 'undefined') {
       history.replaceState({ screen: 'home' }, '');
-      window.addEventListener('popstate', (e) => this.onPop(e.state as { screen?: Screen } | null));
+      window.addEventListener('popstate', (e) => this.onPop(e.state as { screen?: Screen; detour?: boolean } | null));
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') player.pause();
+        this.updateTheme();
       });
+      player.onChange(() => this.updateTheme());
       // Android back button (see MainActivity): the app answers 'exit' only on the home screen.
       (window as unknown as { sifBack?: () => string }).sifBack = () => this.handleBack();
       // The first touch wakes the audio up and decodes the sound effects, so that they are
       // ready on every screen, the very first tap included. (The full unlock, which on iPhone
       // takes over the audio like a music app, waits for the game to start.)
       const firstTouch = () => {
-        void player.ensureContext()?.resume().catch(() => {});
+        void player.ensureContext()?.resume().then(
+          () => this.updateTheme(),
+          () => {},
+        );
         void preloadSfx();
       };
       for (const type of ['pointerup', 'keydown']) window.addEventListener(type, firstTouch, { once: true, capture: true });
@@ -73,9 +84,17 @@ class App {
 
   // ---------------------------------------------------------------- navigation
 
-  go(screen: Screen) {
+  /**
+   * Shows `screen`. With `replace` it takes the place of the current screen in the history,
+   * so that "back" skips that one (the tutorial hands over to the setup this way).
+   */
+  go(screen: Screen, { replace = false } = {}) {
     if (screen === this.screen) return;
     const from = this.screen;
+    // Rules and settings opened from a running game are a detour of the game: no theme there.
+    // Each history entry remembers it, so that "back" restores it.
+    if (from === 'game' && this.game && this.game.phase.t !== 'over') this.detour = screen === 'rules' || screen === 'settings';
+    else if (screen !== 'rules' && screen !== 'settings') this.detour = false;
     if (screen === 'home') {
       this.screen = 'home';
       if (this.depth > 0) {
@@ -85,8 +104,12 @@ class App {
         this.depth = 0;
       }
     } else {
-      history.pushState({ screen }, '');
-      this.depth++;
+      const entry = { screen, detour: this.detour };
+      if (replace && this.depth > 0) history.replaceState(entry, '');
+      else {
+        history.pushState(entry, '');
+        this.depth++;
+      }
       this.screen = screen;
     }
     if (screen === 'game' && from !== 'game') this.enterGame();
@@ -94,10 +117,11 @@ class App {
       this.stopMusic();
       keepAwake(false);
     }
+    this.updateTheme();
   }
 
   /** Browser / Android back. In a game it toggles the pause menu instead of leaving. */
-  private onPop(state: { screen?: Screen } | null) {
+  private onPop(state: { screen?: Screen; detour?: boolean } | null) {
     if (this.unwinding) {
       this.unwinding = false; // our own history.go() back to the home screen
       return;
@@ -110,11 +134,13 @@ class App {
     const from = this.screen;
     this.screen = state?.screen ?? 'home';
     this.depth = this.screen === 'home' ? 0 : Math.max(0, this.depth - 1);
+    this.detour = Boolean(state?.detour);
     if (this.screen === 'game' && from !== 'game') this.enterGame(); // back from rules / settings
     else if (this.screen !== 'game') {
       this.stopMusic();
       keepAwake(false);
     }
+    this.updateTheme();
   }
 
   /** Called by the Android back button: 'exit' closes the app. */
@@ -133,6 +159,29 @@ class App {
     player.stop();
   }
 
+  /**
+   * The main theme plays on the menu screens, while no song plays and the app is in view.
+   * Decided a moment later: the calls often come from the teardown of the screen being left
+   * (it stops its song), where Svelte still shows the previous screen. A burst of calls
+   * (navigation, player state, settings) is also handled once.
+   */
+  private updateTheme() {
+    if (typeof document === 'undefined' || this.themeQueued) return;
+    this.themeQueued = true;
+    queueMicrotask(() => {
+      this.themeQueued = false;
+      this.applyTheme();
+    });
+  }
+
+  private applyTheme() {
+    const menu = MENU_SCREENS.has(this.screen) && !this.detour;
+    const quiet = player.state === 'idle' || player.state === 'error';
+    if (this.settings.menuMusic && menu && quiet && document.visibilityState === 'visible') theme.play();
+    // Out of the menus (or switched off) its decoded audio is dropped too.
+    else theme.stop(!menu || !this.settings.menuMusic);
+  }
+
   // ---------------------------------------------------------------- settings
 
   saveSettings() {
@@ -149,6 +198,7 @@ class App {
     setSfxEnabled(s.sfx);
     setHaptics(s.haptics);
     if (typeof document !== 'undefined') document.documentElement.dataset.motion = s.motion;
+    this.updateTheme();
   }
 
   // ---------------------------------------------------------------- game lifecycle

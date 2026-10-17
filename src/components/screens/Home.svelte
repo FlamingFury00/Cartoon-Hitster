@@ -18,6 +18,11 @@
     sfx.pop();
     app.go('setup');
   }
+
+  function learn() {
+    sfx.pop();
+    app.go('tutorial');
+  }
 </script>
 
 <div class="home">
@@ -36,6 +41,12 @@
       <button class="btn big pink wide resume" onclick={() => app.resumeGame()}>
         <span>Riprendi la partita</span>
         <small>{savedLabel}</small>
+      </button>
+    {/if}
+    {#if !app.settings.tutorialDone}
+      <button class="btn big wide green invite" onclick={learn}>
+        <span>🎓 Impara a giocare</span>
+        <small>Prima volta? Tutorial interattivo · 2 minuti</small>
       </button>
     {/if}
     <button class="btn big wide" onclick={start}><Icon name="play" /> Nuova partita</button>
@@ -110,11 +121,24 @@
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
-  .resume {
+  .resume,
+  .invite {
     flex-direction: column;
     gap: 4px;
   }
-  .resume small {
+  /* A glow, not a movement: the button stays put under the finger. */
+  .invite {
+    animation: glow 1.8s ease-in-out infinite;
+  }
+  @keyframes glow {
+    50% {
+      box-shadow:
+        var(--shadow),
+        0 0 0 6px rgba(79, 217, 107, 0.35);
+    }
+  }
+  .resume small,
+  .invite small {
     font-family: var(--font-body);
     font-weight: 800;
     font-size: 0.8rem;
