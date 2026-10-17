@@ -34,7 +34,8 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2,json,webmanifest}'],
+        // mp3: the sound effects bundled with the app (src/assets/sfx), so they work offline.
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,json,webmanifest,mp3}'],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
         // Audio previews are streamed from the music services and must never be cached here.

@@ -3,7 +3,7 @@
 import * as E from './game/engine';
 import type { GameSettings, GameState, PlayerSetup, Song } from './game/types';
 import { player } from './audio/player';
-import { setSfxEnabled, sfx } from './audio/sfx';
+import { preloadSfx, setSfxEnabled, sfx } from './audio/sfx';
 import { spotifyUrl } from './audio/sources';
 import { songs, songsById } from './deckdata';
 import { haptics, keepAwake, openExternal, setHaptics } from './platform';
@@ -60,6 +60,14 @@ class App {
       });
       // Android back button (see MainActivity): the app answers 'exit' only on the home screen.
       (window as unknown as { sifBack?: () => string }).sifBack = () => this.handleBack();
+      // The first touch wakes the audio up and decodes the sound effects, so that they are
+      // ready on every screen, the very first tap included. (The full unlock, which on iPhone
+      // takes over the audio like a music app, waits for the game to start.)
+      const firstTouch = () => {
+        void player.ensureContext()?.resume().catch(() => {});
+        void preloadSfx();
+      };
+      for (const type of ['pointerup', 'keydown']) window.addEventListener(type, firstTouch, { once: true, capture: true });
     }
   }
 
@@ -179,6 +187,7 @@ class App {
       this.audioError = null;
       this.menuOpen = false;
       player.unlock();
+      sfx.shuffle();
       if (this.screen === 'game') this.enterGame();
       else this.go('game');
     });
@@ -253,7 +262,7 @@ class App {
       player.unlock();
       const next = E.drawCard(g);
       this.set(next);
-      sfx.whoosh();
+      sfx.draw();
       haptics.tap();
       if (next.phase.t === 'listen') this.playCard(next.phase.card);
     });
@@ -273,7 +282,7 @@ class App {
     this.guard(() => {
       const next = E.skipCard(g);
       this.set(next);
-      sfx.coin();
+      sfx.chip();
       haptics.coin();
       if (next.phase.t === 'listen') this.playCard(next.phase.card);
     });
@@ -285,7 +294,7 @@ class App {
     this.guard(() => {
       const next = E.swapUnplayable(g);
       this.set(next);
-      sfx.whoosh();
+      sfx.draw();
       if (next.phase.t === 'listen') this.playCard(next.phase.card);
     });
   }
@@ -297,7 +306,7 @@ class App {
       const wasIntro = g.phase.t === 'intro';
       const next = E.buyCard(g, songsById);
       this.set(next);
-      sfx.coin();
+      sfx.chip(E.BUY_COST);
       haptics.coin();
       if (next.phase.t === 'reveal') {
         if (wasIntro) store.markSeen([next.phase.card]);
@@ -324,7 +333,7 @@ class App {
     if (!g) return;
     this.guard(() => {
       this.set(E.addChallenge(g, playerId, slot));
-      sfx.coin();
+      sfx.chip();
       haptics.coin();
     });
   }

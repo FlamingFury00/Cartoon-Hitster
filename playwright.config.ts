@@ -13,7 +13,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4174',
     locale: 'it-IT',
-    reducedMotion: 'reduce',
+    // Calm reveal (no drum roll) everywhere, except where a test asks for the full show.
+    contextOptions: { reducedMotion: 'reduce' },
     trace: 'retain-on-failure',
     serviceWorkers: 'block',
   },

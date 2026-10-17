@@ -1,212 +1,226 @@
-// Procedural sound effects (no audio files): everything is synthesised with Web Audio
-// oscillators and noise, so the app stays tiny and works offline.
-import { player } from './player';
+// Sound effects: real recordings with free licences (cards and poker chips on a table, a
+// concert snare roll, a cymbal, a boxing bell, a brass fanfare, a small cheering crowd…),
+// prepared by tools/assets/sfx.mjs into src/assets/sfx (credits in CREDITS.md).
+// They are decoded once into AudioBuffers on the music's audio graph, so every effect starts
+// instantly and goes through the same volume control and limiter as the songs.
+import manifest from '../../assets/sfx/manifest.json';
+import { decode, player } from './player';
+
+type Name = keyof typeof manifest;
+
+interface PlayOpts {
+  /** Random pitch/speed spread (±), so repeated sounds are never machine-gun identical. */
+  vary?: number;
+  /** Seconds during which the music is lowered under the effect. */
+  duck?: number;
+  /** Seconds to wait before playing. */
+  delay?: number;
+}
+
+/** A sound effect asked for while the audio is still waking up plays only if this is quick. */
+const LATE_MS = 400;
+/** At most this many copies of one effect at the same time (fast taps on a stepper…). */
+const MAX_VOICES = 4;
+
+const urls = import.meta.glob<string>('../../assets/sfx/*.mp3', { query: '?url', import: 'default', eager: true });
 
 let enabled = true;
-let noiseBuffer: AudioBuffer | null = null;
+/** Loading of each effect (dropped again if it failed, so that it is retried later). */
+const loading = new Map<Name, Promise<void>>();
+const buffers = new Map<Name, AudioBuffer[]>();
+const lastVariant = new Map<Name, number>();
+const voices = new Map<Name, AudioBufferSourceNode[]>();
 
 export function setSfxEnabled(on: boolean) {
   enabled = on;
+  // Switched back on once the audio is up: get the effects ready.
+  if (on && player.ctx) void preloadSfx();
 }
 
-function out(): { ctx: AudioContext; dest: AudioNode } | null {
-  if (!enabled) return null;
-  const dest = player.fxOutput();
+async function load(ctx: BaseAudioContext, file: string): Promise<AudioBuffer | null> {
+  const url = urls[`../../assets/sfx/${file}`];
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await decode(ctx, await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+/** Downloads and decodes one effect (all its variants), once. */
+function prepare(name: Name): Promise<void> {
+  let p = loading.get(name);
+  if (p) return p;
+  const ctx = player.ensureContext();
+  if (!ctx) return Promise.resolve();
+  p = Promise.all(manifest[name].files.map((f) => load(ctx, f))).then((list) => {
+    const ok = list.filter((b): b is AudioBuffer => b !== null);
+    if (ok.length) buffers.set(name, ok);
+    // Not available (e.g. offline before the app was cached): tried again next time.
+    else loading.delete(name);
+  });
+  loading.set(name, p);
+  return p;
+}
+
+/** Downloads and decodes every effect (about 330 kB), unless they are off. Safe to call repeatedly. */
+export function preloadSfx(): Promise<void> {
+  if (!enabled) return Promise.resolve();
+  return Promise.all((Object.keys(manifest) as Name[]).map(prepare)).then(() => undefined);
+}
+
+/** The audio context, if effects can be heard right now. */
+function live(): AudioContext | null {
   const ctx = player.ctx;
-  if (!ctx || !dest || ctx.state !== 'running') return null;
-  return { ctx, dest };
+  return enabled && ctx && ctx.state === 'running' ? ctx : null;
 }
 
-function noise(ctx: AudioContext): AudioBuffer {
-  if (noiseBuffer && noiseBuffer.sampleRate === ctx.sampleRate) return noiseBuffer;
-  const len = ctx.sampleRate;
-  const b = ctx.createBuffer(1, len, ctx.sampleRate);
-  const d = b.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-  noiseBuffer = b;
-  return b;
+function pick(name: Name): AudioBuffer | null {
+  const list = buffers.get(name);
+  if (!list?.length) return null;
+  // A different variant from the previous one, so that the repetition is not noticed.
+  let i = Math.floor(Math.random() * list.length);
+  if (list.length > 1 && i === lastVariant.get(name)) i = (i + 1) % list.length;
+  lastVariant.set(name, i);
+  return list[i];
 }
 
-interface ToneOpts {
-  type?: OscillatorType;
-  freq: number;
-  to?: number;
-  at?: number;
-  dur: number;
-  vol?: number;
-  attack?: number;
-  vibrato?: number;
-  filter?: number;
-}
-
-function tone(ctx: AudioContext, dest: AudioNode, o: ToneOpts) {
-  const t0 = ctx.currentTime + (o.at ?? 0);
-  const osc = ctx.createOscillator();
-  osc.type = o.type ?? 'sine';
-  osc.frequency.setValueAtTime(o.freq, t0);
-  if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t0 + o.dur);
-  const g = ctx.createGain();
-  const vol = o.vol ?? 0.25;
-  const attack = o.attack ?? 0.008;
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(vol, t0 + attack);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + o.dur);
-  let node: AudioNode = osc;
-  if (o.vibrato) {
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.value = 5.5;
-    lfoGain.gain.value = o.vibrato;
-    lfo.connect(lfoGain).connect(osc.frequency);
-    lfo.start(t0);
-    lfo.stop(t0 + o.dur + 0.05);
-  }
-  if (o.filter) {
-    const f = ctx.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.value = o.filter;
-    node.connect(f);
-    node = f;
-  }
-  node.connect(g).connect(dest);
-  osc.start(t0);
-  osc.stop(t0 + o.dur + 0.05);
-}
-
-function burst(ctx: AudioContext, dest: AudioNode, at: number, dur: number, vol: number, type: BiquadFilterType, freq: number, q = 1) {
-  const t0 = ctx.currentTime + at;
+function start(ctx: AudioContext, name: Name, opts: PlayOpts): AudioBufferSourceNode | null {
+  const out = player.fxOutput();
+  const buffer = pick(name);
+  if (!out || !buffer) return null;
   const src = ctx.createBufferSource();
-  src.buffer = noise(ctx);
-  const f = ctx.createBiquadFilter();
-  f.type = type;
-  f.frequency.value = freq;
-  f.Q.value = q;
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(vol, t0);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  src.connect(f).connect(g).connect(dest);
-  src.start(t0, Math.random() * 0.5);
-  src.stop(t0 + dur + 0.02);
+  src.buffer = buffer;
+  if (opts.vary) src.playbackRate.value = 1 + (Math.random() * 2 - 1) * opts.vary;
+  src.connect(out);
+  const playing = voices.get(name) ?? [];
+  while (playing.length >= MAX_VOICES) {
+    try {
+      playing.shift()!.stop();
+    } catch {
+      /* already over */
+    }
+  }
+  playing.push(src);
+  voices.set(name, playing);
+  src.onended = () => {
+    const list = voices.get(name);
+    if (list) voices.set(name, list.filter((v) => v !== src));
+  };
+  src.start(ctx.currentTime + (opts.delay ?? 0));
+  if (opts.duck) player.duck(opts.duck + (opts.delay ?? 0));
+  return src;
 }
+
+function play(name: Name, opts: PlayOpts = {}) {
+  if (!enabled) return;
+  const ctx = live();
+  if (ctx && buffers.has(name)) {
+    start(ctx, name, opts);
+    return;
+  }
+  // First taps after launch: the audio is still being unlocked or decoded. Play the sound
+  // as soon as it is ready, but only if that takes a moment (a late effect is worse than none).
+  const asked = performance.now();
+  const fresh = () => performance.now() - asked < LATE_MS;
+  const suspended = player.ctx;
+  if (suspended && suspended.state !== 'running' && suspended.state !== 'closed') void suspended.resume().catch(() => {});
+  void prepare(name).then(() => {
+    const c = player.ctx;
+    if (!c || !fresh()) return;
+    if (c.state === 'running') {
+      if (live()) start(c, name, opts);
+    } else {
+      c.addEventListener('statechange', () => fresh() && live() && start(c, name, opts), { once: true });
+    }
+  });
+}
+
+/** The drum roll of a reveal, playing until it is ended. */
+export interface Roll {
+  /** Ends the roll: with `crash`, on a cymbal crash (the card lands). */
+  end(crash: boolean): void;
+}
+
+const FOLEY = { vary: 0.06 };
 
 export const sfx = {
-  tap() {
-    const o = out();
-    if (!o) return;
-    tone(o.ctx, o.dest, { type: 'triangle', freq: 880, to: 1320, dur: 0.06, vol: 0.12 });
+  /** Toggles, steppers, chips: a soft click. */
+  tap: () => play('tap', FOLEY),
+  /** Main buttons: a mouth pop. */
+  pop: () => play('pop', { vary: 0.08 }),
+  /** A card drawn from the deck. */
+  draw: () => play('draw', FOLEY),
+  /** The card put down in a slot of the timeline. */
+  place: () => play('place', FOLEY),
+  /** A new game: the deck is shuffled. */
+  shuffle: () => play('shuffle', { vary: 0.03 }),
+  /** Tokens put on the table (skip, buy, challenge): one chip each. */
+  chip(count = 1) {
+    for (let i = 0; i < count; i++) play('chip', { vary: 0.07, delay: i * 0.09 });
   },
-  pop() {
-    const o = out();
-    if (!o) return;
-    tone(o.ctx, o.dest, { type: 'sine', freq: 420, to: 980, dur: 0.09, vol: 0.2 });
-  },
-  whoosh() {
-    const o = out();
-    if (!o) return;
-    const t0 = o.ctx.currentTime;
-    const src = o.ctx.createBufferSource();
-    src.buffer = noise(o.ctx);
-    const f = o.ctx.createBiquadFilter();
-    f.type = 'bandpass';
-    f.Q.value = 1.2;
-    f.frequency.setValueAtTime(300, t0);
-    f.frequency.exponentialRampToValueAtTime(3200, t0 + 0.28);
-    const g = o.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.08);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
-    src.connect(f).connect(g).connect(o.dest);
-    src.start(t0);
-    src.stop(t0 + 0.35);
-  },
-  /** Card dropped into a slot. */
-  place() {
-    const o = out();
-    if (!o) return;
-    burst(o.ctx, o.dest, 0, 0.06, 0.35, 'lowpass', 1800);
-    tone(o.ctx, o.dest, { type: 'sine', freq: 180, to: 90, dur: 0.12, vol: 0.35 });
-  },
-  /** Snare roll that accelerates, used while the card flips. */
-  drumroll(seconds = 1.1) {
-    const o = out();
-    if (!o) return;
-    let t = 0;
-    let step = 0.075;
-    while (t < seconds) {
-      burst(o.ctx, o.dest, t, 0.07, 0.16 + 0.16 * (t / seconds), 'bandpass', 2400, 0.8);
-      t += step;
-      step = Math.max(0.035, step * 0.94);
-    }
-    burst(o.ctx, o.dest, seconds, 0.9, 0.32, 'highpass', 5000, 0.7); // cymbal
-    tone(o.ctx, o.dest, { type: 'sine', freq: 110, to: 55, at: seconds, dur: 0.3, vol: 0.45 }); // kick
-  },
-  correct() {
-    const o = out();
-    if (!o) return;
-    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
-      tone(o.ctx, o.dest, { type: 'triangle', freq: f, at: i * 0.075, dur: 0.32 + i * 0.05, vol: 0.22 }),
-    );
-    [1568, 2093].forEach((f, i) => tone(o.ctx, o.dest, { type: 'sine', freq: f, at: 0.32 + i * 0.06, dur: 0.25, vol: 0.08 }));
-  },
+  /** A token won. */
+  coin: () => play('coin', { vary: 0.03 }),
+  correct: () => play('correct', { duck: 1.1 }),
   /** The classic "wah wah wah waaah" sad trombone. */
-  wrong() {
-    const o = out();
-    if (!o) return;
-    const notes = [311.13, 293.66, 277.18, 261.63];
-    notes.forEach((f, i) =>
-      tone(o.ctx, o.dest, {
-        type: 'sawtooth',
-        freq: f,
-        at: i * 0.32,
-        dur: i === 3 ? 0.95 : 0.3,
-        vol: 0.14,
-        attack: 0.04,
-        vibrato: i === 3 ? 7 : 0,
-        filter: 1100,
-      }),
-    );
-  },
-  coin() {
-    const o = out();
-    if (!o) return;
-    tone(o.ctx, o.dest, { type: 'square', freq: 987.77, dur: 0.08, vol: 0.09, filter: 5000 });
-    tone(o.ctx, o.dest, { type: 'square', freq: 1318.5, at: 0.08, dur: 0.38, vol: 0.09, filter: 5000 });
-  },
-  steal() {
-    const o = out();
-    if (!o) return;
-    tone(o.ctx, o.dest, { type: 'sine', freq: 900, to: 160, dur: 0.35, vol: 0.25 });
-    tone(o.ctx, o.dest, { type: 'triangle', freq: 660, at: 0.3, dur: 0.25, vol: 0.18 });
-    tone(o.ctx, o.dest, { type: 'triangle', freq: 990, at: 0.42, dur: 0.35, vol: 0.18 });
-  },
-  challenge() {
-    const o = out();
-    if (!o) return;
-    tone(o.ctx, o.dest, { type: 'square', freq: 220, dur: 0.12, vol: 0.1, filter: 1600 });
-    tone(o.ctx, o.dest, { type: 'square', freq: 330, at: 0.12, dur: 0.22, vol: 0.1, filter: 1600 });
-  },
-  turn() {
-    const o = out();
-    if (!o) return;
-    tone(o.ctx, o.dest, { type: 'triangle', freq: 392, dur: 0.12, vol: 0.18 });
-    tone(o.ctx, o.dest, { type: 'triangle', freq: 587.33, at: 0.1, dur: 0.22, vol: 0.18 });
-  },
-  fanfare() {
-    const o = out();
-    if (!o) return;
-    const seq: [number, number, number][] = [
-      [392, 0, 0.16],
-      [392, 0.18, 0.16],
-      [392, 0.36, 0.16],
-      [523.25, 0.54, 0.7],
-      [466.16, 1.0, 0.3],
-      [523.25, 1.3, 0.3],
-      [659.25, 1.6, 1.1],
-    ];
-    for (const [f, at, dur] of seq) {
-      tone(o.ctx, o.dest, { type: 'sawtooth', freq: f, at, dur, vol: 0.12, attack: 0.03, filter: 2400 });
-      tone(o.ctx, o.dest, { type: 'square', freq: f / 2, at, dur, vol: 0.05, attack: 0.03, filter: 1200 });
-    }
-    burst(o.ctx, o.dest, 1.6, 1.2, 0.25, 'highpass', 6000, 0.6);
+  wrong: () => play('wrong', { duck: 3.6 }),
+  /** Someone else takes the card: "ooooh!" */
+  steal: () => play('steal', { duck: 1.9 }),
+  /** Boxing bell: the other players may challenge the placement. */
+  challenge: () => play('challenge', { duck: 1.6 }),
+  /** Next player's turn. */
+  turn: () => play('turn'),
+  /** End of the game (the music has stopped): brass fanfare and a cheering crowd. */
+  fanfare: () => play('fanfare'),
+
+  /**
+   * Snare roll while the card spins: it grows louder and a bit faster (the sample loops
+   * seamlessly) until it is ended, and stops by itself after `max` seconds.
+   */
+  drumroll(max = 4): Roll | null {
+    const ctx = live();
+    const out = player.fxOutput();
+    const buffer = buffers.get('roll')?.[0];
+    if (!ctx || !out || !buffer) return null;
+    const [loopStart, loopEnd] = manifest.roll.loop;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    src.loopStart = loopStart;
+    src.loopEnd = loopEnd;
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+    const rise = Math.min(1.1, max / 2);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.linearRampToValueAtTime(1, now + rise);
+    gain.gain.setValueAtTime(1, now + Math.max(rise, max - 0.3));
+    gain.gain.linearRampToValueAtTime(0.0001, now + max);
+    src.playbackRate.setValueAtTime(1, now);
+    src.playbackRate.linearRampToValueAtTime(1.07, now + rise);
+    src.connect(gain).connect(out);
+    src.start(now);
+    src.stop(now + max + 0.05);
+    player.duck(max);
+    let ended = false;
+    return {
+      end(crash: boolean) {
+        if (ended) return;
+        ended = true;
+        const t = ctx.currentTime;
+        gain.gain.cancelScheduledValues(t);
+        gain.gain.setValueAtTime(gain.gain.value, t);
+        gain.gain.linearRampToValueAtTime(0.0001, t + 0.06);
+        try {
+          src.stop(t + 0.08);
+        } catch {
+          /* already stopped */
+        }
+        // The music stays low under the crash (and the verdict that follows), or comes back.
+        player.unduck(crash ? 1.5 : 0);
+        if (crash) play('crash');
+      },
+    };
   },
 };

@@ -125,6 +125,21 @@
       Audio: anteprime pubbliche di Deezer e Spotify, riprodotte in streaming. Nessun brano è incluso nell'app.
       {isAndroidApp ? 'Versione Android.' : 'Versione web: puoi installarla dal menu del browser ("Aggiungi a schermata Home").'}
     </p>
+    <details class="credits small">
+      <summary>🎺 Crediti degli effetti sonori</summary>
+      <p>Registrazioni vere con licenza libera, accorciate e normalizzate per il gioco:</p>
+      <ul>
+        <li>Carte, fiches, monete, clic e jingle: <a href="https://kenney.nl/assets" target="_blank" rel="noopener noreferrer">Kenney</a> (CC0)</li>
+        <li>Rullo di tamburi: United States Air Force Band (pubblico dominio)</li>
+        <li>Piatto, «pop», applausi e «ooh» del pubblico: aradlaw, cori, starlite su pdsounds.org (pubblico dominio)</li>
+        <li>Campana da ring: IOII-IOIO-IIOI su Wikimedia Commons (CC0)</li>
+        <li>Fanfara: fvcalderan su <a href="https://opengameart.org/content/classic-fanfare-lick" target="_blank" rel="noopener noreferrer">OpenGameArt</a> (CC0)</li>
+        <li>
+          «<a href="https://soundbible.com/1830-Sad-Trombone.html" target="_blank" rel="noopener noreferrer">Sad Trombone</a>» di Joe Lamb, licenza
+          <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a>
+        </li>
+      </ul>
+    </details>
     {#if !confirmReset}
       <button class="btn small ghost danger" onclick={() => (confirmReset = true)}>🗑️ Cancella tutti i dati</button>
     {:else}
@@ -222,6 +237,22 @@
   .small {
     font-size: 0.85rem;
     color: var(--ink-2);
+  }
+  .credits summary {
+    font-weight: 900;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  .credits ul {
+    margin: 6px 0 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .credits a {
+    color: inherit;
+    font-weight: 800;
   }
   .danger {
     --btn-fg: var(--red);

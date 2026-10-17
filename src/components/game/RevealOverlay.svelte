@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { fade, fly, scale } from 'svelte/transition';
   import { app } from '../../lib/app.svelte';
-  import { sfx } from '../../lib/audio/sfx';
+  import { sfx, type Roll } from '../../lib/audio/sfx';
   import { spotifyUrl } from '../../lib/audio/sources';
   import { song } from '../../lib/deckdata';
   import * as E from '../../lib/game/engine';
@@ -31,6 +31,7 @@
   let confetti = $state(0);
   let guess = $state<E.Guess>({ cartoon: false, performer: false });
   const timers: ReturnType<typeof setTimeout>[] = [];
+  let roll: Roll | null = null;
 
   const verdict = $derived.by(() => {
     if (outcome.bought) return { text: 'COMPRATA!', cls: 'bought' };
@@ -50,9 +51,12 @@
   const calm = () => prefersReducedMotion() || app.settings.motion === 'reduced';
 
   function land() {
-    if (landed) return;
+    if (flipped) return; // a second tap while the card turns
     flipped = true;
     tension = false;
+    // The drum roll ends on a cymbal crash as the card turns.
+    roll?.end(true);
+    roll = null;
     timers.push(
       setTimeout(() => {
         landed = true;
@@ -70,13 +74,17 @@
     } else {
       timers.push(
         setTimeout(() => {
+          if (flipped) return; // already revealed with a tap
           tension = true;
-          sfx.drumroll(1.05);
+          roll = sfx.drumroll();
         }, 380),
       );
       timers.push(setTimeout(land, 1450));
     }
-    return () => timers.forEach(clearTimeout);
+    return () => {
+      timers.forEach(clearTimeout);
+      roll?.end(false);
+    };
   });
 
   function toggle(k: keyof E.Guess) {
