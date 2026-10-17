@@ -17,22 +17,44 @@ test('a new player starts with the tutorial, every time until it is done or skip
   // The home screen is underneath, with its invitation.
   await page.getByRole('button', { name: 'Indietro' }).click();
   await expect(page.getByRole('button', { name: /Impara a giocare/ })).toBeVisible();
-  // Left without playing: next time it opens with the tutorial again.
+  // Left without playing: next time it opens with the tutorial again…
   await page.reload();
   await expect(page.getByRole('button', { name: 'Iniziamo!' })).toBeVisible();
+  // …where the Android back button leads home too, and from there out of the app.
+  const back = () => page.evaluate(() => (window as unknown as { sifBack: () => string }).sifBack());
+  expect(await back()).toBe('handled');
+  await expect(page.getByRole('button', { name: /Impara a giocare/ })).toBeVisible();
+  expect(await back()).toBe('exit');
 });
 
-test('who has already played is not sent to the tutorial, only invited', async ({ page }) => {
-  await seed(page, null, { tutorialDone: false });
-  await page.addInitScript(() => {
-    const player = { name: 'Anna', avatar: '🐱', color: '#ff4f9a', cards: 10, tokens: 1, correct: 9, placed: 10, steals: 0, bestStreak: 5 };
-    const entry = { id: 'g1', startedAt: 1, endedAt: 2, mode: 'classic', target: 10, reason: 'target', turns: 20, winners: ['Anna'], players: [player] };
-    localStorage.setItem('sif.history.v1', JSON.stringify([entry]));
+const played = {
+  // A finished game in the history…
+  'sif.history.v1': [
+    {
+      id: 'g1',
+      startedAt: 1,
+      endedAt: 2,
+      mode: 'classic',
+      target: 10,
+      reason: 'target',
+      turns: 20,
+      winners: ['Anna'],
+      players: [{ name: 'Anna', avatar: '🐱', color: '#ff4f9a', cards: 10, tokens: 1, correct: 9, placed: 10, steals: 0, bestStreak: 5 }],
+    },
+  ],
+  // …or only the players of a game (the history was cleared).
+  'sif.roster.v1': [{ name: 'Anna', avatar: '🐱', color: '#ff4f9a' }],
+};
+
+for (const [key, value] of Object.entries(played)) {
+  test(`who has already played is not sent to the tutorial, only invited (${key})`, async ({ page }) => {
+    await seed(page, null, { tutorialDone: false });
+    await page.addInitScript(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [key, value] as const);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: /Impara a giocare/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Iniziamo!' })).toHaveCount(0);
   });
-  await page.goto('/');
-  await expect(page.getByRole('button', { name: /Impara a giocare/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Iniziamo!' })).toHaveCount(0);
-});
+}
 
 test('the tutorial teaches by playing, and leaves the saved game alone', async ({ page }) => {
   const game = makeGame();

@@ -14,13 +14,13 @@ import { decode, player } from './player';
 
 /** Seconds decoded first: the intro and the start of the loop, time enough to decode the rest. */
 const HEAD = 9;
-/** The end of those seconds is left out (decoders may treat the end of a cut file their own way). */
-const HEAD_MARGIN = 0.25;
+/** Their very end is not relied on (a decoder may treat the end of a cut file its own way). */
+const HEAD_MARGIN = 0.02;
 /**
  * The audio is computed ahead of time: a start set at least this far ahead is kept to the
  * sample, so that the whole theme can take over exactly where its first seconds are.
  */
-const LEAD = 0.1;
+const LEAD = 0.2;
 /** Crossfade from the first seconds to the whole theme (the same audio on both sides). */
 const HANDOFF = 0.05;
 const FADE_OUT = 0.8;
@@ -30,12 +30,29 @@ interface Voice {
   gain: GainNode;
 }
 
+/**
+ * How the whole theme takes over from its first seconds, started at `startedAt` and whose
+ * audio ends `end` seconds into the theme: at `when` (a moment after `now`, on the sample grid
+ * of the start), from `offset`, with a crossfade of `fade` seconds. The same audio is on both
+ * sides, so the crossfade cannot be heard as long as it is over before the first seconds end;
+ * if they ran out first (a very slow device), the music comes back where it would be, gently.
+ */
+export function planHandoff(now: number, startedAt: number, end: number, rate: number) {
+  const at = Math.ceil((now + LEAD - startedAt) * rate) / rate;
+  const [a, b] = meta.loop;
+  return {
+    when: startedAt + at,
+    offset: at < b ? at : a + ((at - a) % (b - a)),
+    fade: at < end ? Math.min(HANDOFF, end - at) : 0.3,
+  };
+}
+
 class ThemePlayer {
   /** The file (kept: decoding it again after a game does not download it again). */
   private file: Promise<ArrayBuffer | null> | null = null;
   private loading: Promise<void> | null = null;
-  /** The first seconds of the theme, until the whole of it is decoded. */
-  private head: { buffer: AudioBuffer; until: number } | null = null;
+  /** The first seconds of the theme (and where their audio ends), until all of it is decoded. */
+  private head: { buffer: AudioBuffer; end: number } | null = null;
   private whole: AudioBuffer | null = null;
   /** Volume of the theme (its fades); null while it does not play. */
   private out: GainNode | null = null;
@@ -43,7 +60,7 @@ class ThemePlayer {
   /** The first seconds playing, waiting for the whole theme: since when, and up to where. */
   private headVoice: Voice | null = null;
   private startedAt = 0;
-  private headUntil = 0;
+  private headEnd = 0;
   private wanted = false;
   private release = false;
   private waiting = false;
@@ -80,7 +97,8 @@ class ThemePlayer {
     if (part) {
       const buffer = await decode(ctx, bytes.slice(0, part.size)).catch(() => null);
       if (buffer) {
-        this.head = { buffer, until: part.seconds - HEAD_MARGIN };
+        // Its audio is shorter than its frames: the first frame is a tag, the encoder's delay is cut.
+        this.head = { buffer, end: Math.min(buffer.duration, part.seconds) - HEAD_MARGIN };
         this.ready();
       }
     }
@@ -145,20 +163,13 @@ class ThemePlayer {
     // The file opens on silence: no fade-in, the first note is heard straight away.
     const voice = this.voice(ctx, buffer, this.startedAt, 0);
     this.headVoice = this.whole ? null : voice;
-    this.headUntil = this.head?.until ?? 0;
+    this.headEnd = this.head?.end ?? 0;
   }
 
   /** The whole theme takes over from its first seconds, on the very same sample. */
   private handoff(ctx: AudioContext, head: Voice, whole: AudioBuffer) {
     this.headVoice = null;
-    // A moment from now, on the sample grid of the start.
-    const rate = whole.sampleRate;
-    const frames = Math.ceil((ctx.currentTime + LEAD - this.startedAt) * rate);
-    const when = this.startedAt + frames / rate;
-    const at = frames / rate;
-    // The same audio on both sides: a crossfade nobody can hear. If the first seconds ran out
-    // first (a very slow device), the music comes back where it would be, more gently.
-    const fade = at + HANDOFF <= this.headUntil ? HANDOFF : 0.3;
+    const { when, offset, fade } = planHandoff(ctx.currentTime, this.startedAt, this.headEnd, whole.sampleRate);
     head.gain.gain.setValueAtTime(1, when);
     head.gain.gain.linearRampToValueAtTime(0, when + fade);
     try {
@@ -166,8 +177,7 @@ class ThemePlayer {
     } catch {
       /* already over */
     }
-    const [a, b] = meta.loop;
-    this.voice(ctx, whole, when, at < b ? at : a + ((at - a) % (b - a)), fade);
+    this.voice(ctx, whole, when, offset, fade);
   }
 
   /** Plays `buffer` from `offset` at `when` (the whole theme loops), fading in over `fade`. */

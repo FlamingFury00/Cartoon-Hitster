@@ -96,11 +96,13 @@ test('no theme on the rules opened from a running game', async ({ page }) => {
 
 test('the first seconds decode into exactly the first samples of the whole theme', async ({ page }) => {
   await seed(page, null);
+  // The app downloads the theme at launch.
+  const download = page.waitForResponse(/\/assets\/theme-[^/]*\.mp3$/);
   await page.goto('/');
+  const url = (await download).url();
   const head = mp3Head(new Uint8Array(readFileSync(new URL(`../../src/assets/music/${meta.file}`, import.meta.url))), 9)!;
-  const result = await page.evaluate(async (size) => {
-    const url = performance.getEntriesByType('resource').find((e) => /theme-[^/]*\.mp3$/.test(e.name))?.name;
-    const bytes = await (await fetch(url!)).arrayBuffer();
+  const result = await page.evaluate(async ({ url, size }) => {
+    const bytes = await (await fetch(url)).arrayBuffer();
     const out: Record<number, { seconds: number; differ: number }> = {};
     for (const rate of [44100, 48000]) {
       const ctx = new OfflineAudioContext(2, 1, rate);
@@ -115,7 +117,7 @@ test('the first seconds decode into exactly the first samples of the whole theme
       out[rate] = { seconds: part.length / rate, differ };
     }
     return out;
-  }, head.size);
+  }, { url, size: head.size });
   for (const rate of [44100, 48000]) {
     expect(result[rate].seconds).toBeGreaterThan(head.seconds - 0.1);
     expect(result[rate].differ).toBe(0);

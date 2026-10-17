@@ -85,14 +85,18 @@ class App {
         void preloadSfx();
       };
       for (const type of ['pointerup', 'keydown']) window.addEventListener(type, firstTouch, { once: true, capture: true });
-      // A new player starts with the tutorial (the home screen stays underneath, for "back").
+      // A new player starts with the tutorial, above the home screen: "back" (its arrow, the
+      // Android back button) leads there. A browser's own Back button does so once the screen
+      // has been touched: browsers skip history entries added before any touch.
       if (this.newPlayer()) this.go('tutorial');
     }
   }
 
   /** Nobody has played on this device yet, nor finished or skipped the tutorial. */
   private newPlayer(): boolean {
-    return !this.settings.tutorialDone && !this.game && store.loadHistory().length === 0;
+    if (this.settings.tutorialDone || this.game) return false;
+    // The players of the last game are kept even when the history is cleared.
+    return store.loadRoster().length === 0 && store.loadHistory().length === 0;
   }
 
   // ---------------------------------------------------------------- navigation

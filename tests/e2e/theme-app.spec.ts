@@ -51,4 +51,8 @@ test('a new player hears the theme in the tutorial, until its lesson starts and 
   await page.waitForTimeout(300);
   expect(await themeOn(page)).toBe(true);
   expect(await themeStarts(page)).toBe(starts + 1);
+  // The setup took the tutorial's place: back goes home.
+  await page.getByRole('button', { name: 'Indietro' }).click();
+  await expect(page.getByRole('button', { name: /Nuova partita/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Impara a giocare/ })).toHaveCount(0);
 });

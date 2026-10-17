@@ -2,6 +2,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import theme from '../../src/assets/music/theme.json';
 import { mp3Head } from '../../src/lib/audio/mp3';
+import { planHandoff } from '../../src/lib/audio/theme';
 import { songsById } from '../../src/lib/deckdata';
 import { insertSorted } from '../../src/lib/game/timeline';
 import { BRUNO, TUTORIAL as T, YOU, rightSlot } from '../../src/lib/tutorial';
@@ -62,6 +63,45 @@ describe('main theme', () => {
     const all = mp3Head(bytes, theme.seconds)!;
     expect(bytes.length - all.size).toBeLessThan(1000);
     expect(mp3Head(bytes, theme.seconds + 1)).toBeNull();
+  });
+});
+
+describe('the whole theme taking over from its first seconds', () => {
+  const rate = 48000;
+  const startedAt = 0.3;
+  const end = 8.94; // where the audio of the first seconds ends, into the theme
+  const plan = (at: number) => planHandoff(startedAt + at - 0.2, startedAt, end, rate);
+
+  it('goes on from where they are, on the sample grid of their start', () => {
+    const p = planHandoff(0.512345, startedAt, end, rate);
+    const frames = p.offset * rate;
+    expect(Math.abs(frames - Math.round(frames))).toBeLessThan(1e-6);
+    expect(p.when - startedAt).toBeCloseTo(p.offset, 12);
+    // A moment ahead, for the start to be kept to the sample.
+    expect(p.when - 0.512345).toBeGreaterThanOrEqual(0.2);
+    expect(p.when - 0.512345).toBeLessThan(0.2 + 1 / rate);
+    expect(p.fade).toBe(0.05);
+  });
+
+  it('crossfades only while their audio lasts', () => {
+    // Near their end the crossfade gets shorter: it is over exactly when they end.
+    for (const at of [8.7, 8.85, 8.9, 8.93, 8.9399]) {
+      const p = plan(at);
+      expect(p.offset).toBeCloseTo(at, 4);
+      expect(p.offset + p.fade).toBeLessThanOrEqual(end + 1e-9);
+      expect(p.fade).toBeGreaterThan(0);
+    }
+    expect(plan(8.5).fade).toBe(0.05);
+  });
+
+  it('after they ran out, comes back where the music would be, with a gentle fade', () => {
+    const p = plan(9.5);
+    expect(p.offset).toBeCloseTo(9.5, 4);
+    expect(p.fade).toBe(0.3);
+    // Even past the end of the file, inside the loop.
+    const [a, b] = theme.loop;
+    const late = plan(b + 10);
+    expect(late.offset).toBeCloseTo(a + 10, 3);
   });
 });
 
