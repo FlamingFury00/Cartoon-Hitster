@@ -60,7 +60,7 @@ class App {
     this.applySettings();
     if (typeof window !== 'undefined') {
       history.replaceState({ screen: 'home' }, '');
-      window.addEventListener('popstate', (e) => this.onPop(e.state as { screen?: Screen } | null));
+      window.addEventListener('popstate', (e) => this.onPop(e.state as { screen?: Screen; detour?: boolean } | null));
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') player.pause();
         this.updateTheme();
@@ -84,11 +84,17 @@ class App {
 
   // ---------------------------------------------------------------- navigation
 
-  go(screen: Screen) {
+  /**
+   * Shows `screen`. With `replace` it takes the place of the current screen in the history,
+   * so that "back" skips that one (the tutorial hands over to the setup this way).
+   */
+  go(screen: Screen, { replace = false } = {}) {
     if (screen === this.screen) return;
     const from = this.screen;
-    if (screen === 'game' || screen === 'home') this.detour = false;
-    else if (from === 'game' && this.game && this.game.phase.t !== 'over') this.detour = true;
+    // Rules and settings opened from a running game are a detour of the game: no theme there.
+    // Each history entry remembers it, so that "back" restores it.
+    if (from === 'game' && this.game && this.game.phase.t !== 'over') this.detour = screen === 'rules' || screen === 'settings';
+    else if (screen !== 'rules' && screen !== 'settings') this.detour = false;
     if (screen === 'home') {
       this.screen = 'home';
       if (this.depth > 0) {
@@ -98,8 +104,12 @@ class App {
         this.depth = 0;
       }
     } else {
-      history.pushState({ screen }, '');
-      this.depth++;
+      const entry = { screen, detour: this.detour };
+      if (replace && this.depth > 0) history.replaceState(entry, '');
+      else {
+        history.pushState(entry, '');
+        this.depth++;
+      }
       this.screen = screen;
     }
     if (screen === 'game' && from !== 'game') this.enterGame();
@@ -111,7 +121,7 @@ class App {
   }
 
   /** Browser / Android back. In a game it toggles the pause menu instead of leaving. */
-  private onPop(state: { screen?: Screen } | null) {
+  private onPop(state: { screen?: Screen; detour?: boolean } | null) {
     if (this.unwinding) {
       this.unwinding = false; // our own history.go() back to the home screen
       return;
@@ -124,7 +134,7 @@ class App {
     const from = this.screen;
     this.screen = state?.screen ?? 'home';
     this.depth = this.screen === 'home' ? 0 : Math.max(0, this.depth - 1);
-    if (this.screen === 'game' || this.screen === 'home') this.detour = false;
+    this.detour = Boolean(state?.detour);
     if (this.screen === 'game' && from !== 'game') this.enterGame(); // back from rules / settings
     else if (this.screen !== 'game') {
       this.stopMusic();

@@ -57,8 +57,15 @@ class ThemePlayer {
       return;
     }
     void this.load(ctx).then((buffer) => {
+      if (!this.wanted) {
+        if (this.release) this.buffer = null; // stopped for good while it was loading
+        return;
+      }
+      if (this.node) return;
+      // Interrupted while loading (a call on iPhone…): wait for the audio again.
+      if (ctx.state !== 'running') return this.play();
       const out = player.musicOutput();
-      if (!buffer || !out || !this.wanted || this.node || ctx.state !== 'running') return;
+      if (!buffer || !out) return;
       const node = ctx.createBufferSource();
       node.buffer = buffer;
       node.loop = true;

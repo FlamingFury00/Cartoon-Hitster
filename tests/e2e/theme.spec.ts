@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import meta from '../../src/assets/music/theme.json' with { type: 'json' };
 import manifest from '../../src/assets/sfx/manifest.json' with { type: 'json' };
 import { makeGame, mockMusic, seed } from './helpers';
+import { toFinish, toFirstReveal } from './tutorial-steps';
 
 type Source = { duration: number; loop: boolean; stopped: boolean };
 
@@ -75,6 +76,23 @@ test('no theme when the menu music is switched off', async ({ page }) => {
   await audioAwake(page);
   expect(await themes(page)).toEqual([]);
   expect(await page.evaluate(() => performance.getEntriesByType('resource').some((e) => /theme-[^/]*\.mp3$/.test(e.name)))).toBe(false);
+});
+
+test('the rules of a running game stay quiet, the setup reached from there does not', async ({ page }) => {
+  await seed(page, makeGame());
+  await page.goto('/');
+  await page.getByRole('button', { name: /Riprendi la partita/ }).click();
+  await page.getByRole('button', { name: 'Menu di pausa' }).click();
+  await page.getByRole('button', { name: /Regole/ }).click();
+  await page.getByRole('button', { name: /tutorial interattivo/ }).click();
+  await toFirstReveal(page);
+  await toFinish(page);
+  await page.getByRole('button', { name: /Gioca una partita/ }).click();
+  await expect.poll(() => themes(page)).toEqual([false]);
+  // Back to the rules opened from the game: quiet again.
+  await page.getByRole('button', { name: 'Indietro' }).click();
+  await expect(page.getByRole('heading', { name: /Lo scopo/ })).toBeVisible();
+  await expect.poll(() => themes(page)).toEqual([true]);
 });
 
 test('no theme on the rules opened from a running game', async ({ page }) => {

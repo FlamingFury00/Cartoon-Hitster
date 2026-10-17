@@ -61,9 +61,17 @@
   let confetti = $state(0);
   let pstate = $state<PlaybackState>(player.state);
   let stage: HTMLElement | undefined = $state();
+  /** The song of the current step (to load it again after a failed attempt). */
+  let current = '';
+  /** Briefly false after each step: a double tap must not also press the next step's button. */
+  let ready = $state(true);
+  let readyTimer: ReturnType<typeof setTimeout> | undefined;
 
   onMount(() => player.onChange((s) => (pstate = s)));
-  onDestroy(() => player.stop());
+  onDestroy(() => {
+    clearTimeout(readyTimer);
+    player.stop();
+  });
 
   const listening = $derived(step === 'place1' || step === 'place2' || step === 'rival');
   const rivalFree = $derived([0, 1, 2].filter((s) => s !== T.rivalSlot));
@@ -74,13 +82,24 @@
     step = next;
     landed = false;
     stage?.scrollTo({ top: 0 });
+    ready = false;
+    clearTimeout(readyTimer);
+    readyTimer = setTimeout(() => (ready = true), 350);
+    // Seen to the end: done, even if the player leaves with "back".
+    if (next === 'finish') markDone();
   }
 
   function listen(id: string) {
+    current = id;
     player.unlock();
     audioFailed = false;
     player.play(song(id)).catch(() => (audioFailed = true));
   }
+
+  // Nothing loaded (the last attempt failed): the buttons load the song again.
+  const idle = () => pstate === 'idle' || pstate === 'error';
+  const playPause = () => (idle() ? listen(current) : player.toggle());
+  const restart = () => (idle() ? listen(current) : player.restart());
 
   function draw(id: string, next: Step) {
     sfx.draw();
@@ -160,11 +179,19 @@
     goTo('reveal3');
   }
 
-  function done(next: 'setup' | 'home') {
+  function markDone() {
+    if (app.settings.tutorialDone) return;
     app.settings.tutorialDone = true;
     app.saveSettings();
-    if (next === 'setup') sfx.pop();
-    app.go(next);
+  }
+
+  function done(next: 'setup' | 'home') {
+    markDone();
+    if (next === 'setup') {
+      sfx.pop();
+      // The setup takes the tutorial's place: "back" from there goes home, not to the tutorial.
+      app.go('setup', { replace: true });
+    } else app.go('home');
   }
 </script>
 
@@ -238,8 +265,8 @@
         {:else if step === 'bonus'}
           {#if !earned}
             <p>
-              <b>Bonus!</b> Se mentre ascolti dici anche il <b>cartone</b> e <b>chi canta</b>, vinci un gettone 🪙. Era «{second.title}» dei
-              {second.cartoon}, cantata da {second.performer}.
+              <b>Bonus!</b> Se mentre ascolti dici anche il <b>cartone</b> e <b>chi canta</b>, vinci un gettone 🪙. Era «{second.title}», dal
+              cartone «{second.cartoon}», cantata da {second.performer}.
             </p>
             <p>Facciamo finta che tu li abbia indovinati: tocca <b>tutti e due</b>!</p>
           {:else}
@@ -284,10 +311,10 @@
       <div class="deck">
         <div class="tape"><Cassette side={step === 'rival' ? 'B' : 'A'} /></div>
         <div class="transport">
-          <button class="icon-btn big" aria-label={pstate === 'playing' ? 'Pausa' : 'Riproduci'} disabled={pstate === 'loading'} onclick={() => player.toggle()}>
+          <button class="icon-btn big" aria-label={pstate === 'playing' ? 'Pausa' : 'Riproduci'} disabled={pstate === 'loading'} onclick={playPause}>
             <Icon name={pstate === 'playing' ? 'pause' : 'play'} size={28} />
           </button>
-          <button class="icon-btn" aria-label="Ricomincia la sigla" disabled={pstate === 'loading'} onclick={() => player.restart()}>
+          <button class="icon-btn" aria-label="Ricomincia la sigla" disabled={pstate === 'loading'} onclick={restart}>
             <Icon name="replay" />
           </button>
         </div>
@@ -355,36 +382,36 @@
 
   <footer class="bar">
     {#if step === 'welcome'}
-      <button class="btn big wide" onclick={() => (sfx.pop(), goTo('timeline'))}>Iniziamo!</button>
+      <button class="btn big wide" disabled={!ready} onclick={() => (sfx.pop(), goTo('timeline'))}>Iniziamo!</button>
     {:else if step === 'timeline'}
-      <button class="btn big wide" onclick={() => (sfx.tap(), goTo('draw1'))}>Ho capito</button>
+      <button class="btn big wide" disabled={!ready} onclick={() => (sfx.tap(), goTo('draw1'))}>Ho capito</button>
     {:else if step === 'draw1'}
-      <button class="btn big wide" onclick={() => draw(T.first, 'place1')}><Icon name="music" /> Pesca la sigla</button>
+      <button class="btn big wide" disabled={!ready} onclick={() => draw(T.first, 'place1')}><Icon name="music" /> Pesca la sigla</button>
     {:else if step === 'draw2'}
-      <button class="btn big wide" onclick={() => draw(T.second, 'place2')}><Icon name="music" /> Pesca la sigla</button>
+      <button class="btn big wide" disabled={!ready} onclick={() => draw(T.second, 'place2')}><Icon name="music" /> Pesca la sigla</button>
     {:else if step === 'place1' || step === 'place2'}
-      <button class="btn big wide pink" disabled={slot == null} onclick={confirm}><Icon name="check" /> Conferma</button>
+      <button class="btn big wide pink" disabled={!ready || slot == null} onclick={confirm}><Icon name="check" /> Conferma</button>
     {:else if step === 'reveal1'}
-      <button class="btn big wide green" disabled={!landed} onclick={() => ((mine = insertSorted(mine, T.first, yearOf)), player.stop(), goTo('draw2'))}>Avanti</button>
+      <button class="btn big wide green" disabled={!ready || !landed} onclick={() => ((mine = insertSorted(mine, T.first, yearOf)), player.stop(), goTo('draw2'))}>Avanti</button>
     {:else if step === 'reveal2'}
-      <button class="btn big wide green" disabled={!landed} onclick={() => (secondRight && (mine = insertSorted(mine, T.second, yearOf)), goTo('bonus'))}>
+      <button class="btn big wide green" disabled={!ready || !landed} onclick={() => (secondRight && (mine = insertSorted(mine, T.second, yearOf)), goTo('bonus'))}>
         Avanti
       </button>
     {:else if step === 'bonus'}
-      <button class="btn big wide green" disabled={!earned} onclick={startRival}>Avanti</button>
+      <button class="btn big wide green" disabled={!ready || !earned} onclick={startRival}>Avanti</button>
     {:else if step === 'rival'}
       {#if challengeSlot != null}
         <button class="btn big wide green" in:fly={{ y: 20 }} onclick={turnRival}>🃏 Gira la carta!</button>
       {:else}
-        <button class="btn big wide purple" disabled={challenging} onclick={challenge}>🥊 Sfida {BRUNO.name} · 1 🪙</button>
+        <button class="btn big wide purple" disabled={!ready || challenging} onclick={challenge}>🥊 Sfida {BRUNO.name} · 1 🪙</button>
       {/if}
     {:else if step === 'reveal3'}
-      <button class="btn big wide green" disabled={!landed} onclick={() => (stole && (mine = insertSorted(mine, T.steal, yearOf)), player.stop(), goTo('finish'))}>
+      <button class="btn big wide green" disabled={!ready || !landed} onclick={() => (stole && (mine = insertSorted(mine, T.steal, yearOf)), player.stop(), goTo('finish'))}>
         Avanti
       </button>
     {:else}
-      <button class="btn big wide pink" onclick={() => done('setup')}>🎉 Gioca una partita</button>
-      <button class="btn small ghost" onclick={() => done('home')}>Torna al menu</button>
+      <button class="btn big wide pink" disabled={!ready} onclick={() => done('setup')}>🎉 Gioca una partita</button>
+      <button class="btn small ghost" disabled={!ready} onclick={() => done('home')}>Torna al menu</button>
     {/if}
   </footer>
 </div>
