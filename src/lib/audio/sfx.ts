@@ -145,6 +145,8 @@ export interface Roll {
 }
 
 const FOLEY = { vary: 0.06 };
+/** Seconds the music stays low under the cymbal (and the verdict that follows it). */
+const CRASH_DUCK = 1.5;
 
 export const sfx = {
   /** Toggles, steppers, chips: a soft click. */
@@ -174,6 +176,8 @@ export const sfx = {
   turn: () => play('turn'),
   /** End of the game (the music has stopped): brass fanfare and a cheering crowd. */
   fanfare: () => play('fanfare'),
+  /** The card turns: cymbal crash (on its own when there was no drum roll to end). */
+  crash: () => play('crash', { duck: CRASH_DUCK }),
 
   /**
    * Snare roll while the card spins: it grows louder and a bit faster (the sample loops
@@ -218,7 +222,7 @@ export const sfx = {
           /* already stopped */
         }
         // The music stays low under the crash (and the verdict that follows), or comes back.
-        player.unduck(crash ? 1.5 : 0);
+        player.unduck(crash ? CRASH_DUCK : 0);
         if (crash) play('crash');
       },
     };

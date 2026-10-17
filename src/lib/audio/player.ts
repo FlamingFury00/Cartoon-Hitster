@@ -148,12 +148,13 @@ export class MusicPlayer {
    * under its jingles, so that a sound effect is heard over a loud chorus.
    */
   duck(seconds: number) {
-    if (this.ctx) this.duckTo(Math.max(this.duckUntil, this.ctx.currentTime + seconds));
+    // Effects volume at zero: there is nothing to make room for.
+    if (this.ctx && this.fxVolume > 0) this.duckTo(Math.max(this.duckUntil, this.ctx.currentTime + seconds));
   }
 
   /** The effect that lowered the music was cut short: the music comes back after `seconds`. */
   unduck(seconds = 0) {
-    if (this.ctx) this.duckTo(this.ctx.currentTime + seconds);
+    if (this.ctx) this.duckTo(this.ctx.currentTime + (this.fxVolume > 0 ? seconds : 0));
   }
 
   private duckTo(until: number) {

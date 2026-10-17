@@ -54,8 +54,10 @@
     if (flipped) return; // a second tap while the card turns
     flipped = true;
     tension = false;
-    // The drum roll ends on a cymbal crash as the card turns.
-    roll?.end(true);
+    // The drum roll ends on a cymbal crash as the card turns; a card tapped before the roll
+    // started (or with the roll not ready yet) still gets its crash.
+    if (roll) roll.end(true);
+    else if (!calm() && !outcome.bought) sfx.crash();
     roll = null;
     timers.push(
       setTimeout(() => {
