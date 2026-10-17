@@ -19,7 +19,8 @@
     "deck:match": "node tools/deck/match.mjs deck/songs.csv",
     "deck:sources": "node tools/deck/sources.mjs deck/songs.csv",
     "deck:loudness": "node tools/deck/loudness.mjs deck/songs.csv",
-    "icons": "node tools/assets/render-icons.mjs"
+    "icons": "node tools/assets/render-icons.mjs",
+    "sfx": "node tools/assets/sfx.mjs"
   },
   "devDependencies": {
     "@fontsource-variable/nunito": "^5.3.0",

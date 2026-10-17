@@ -5,7 +5,8 @@
 // the song instantly and sample-accurately. Everything runs through one Web Audio graph:
 //
 //   buffer source -> track gain (loudness normalisation) -> fade gain -> music volume
-//                 -> compressor (safety limiter) -> analyser (visualiser) -> speakers
+//                 -> ducking -> compressor (safety limiter) -> analyser (visualiser) -> speakers
+//   sound effects -> effects volume ---------------------^
 //
 // If decoding is impossible (very old WebViews) a plain <audio> element is used instead.
 import type { Song } from '../game/types';
@@ -26,6 +27,10 @@ const LOOP_FADE = 1.4;
 const LOOP_GAP_MS = 900;
 const FETCH_TIMEOUT = 15000;
 const CACHE_SIZE = 4;
+/** Music level under a sound effect (-8 dB), and how fast it dips and comes back. */
+const DUCK_LEVEL = 0.4;
+const DUCK_ATTACK = 0.08;
+const DUCK_RELEASE = 0.7;
 
 const dbToGain = (db: number) => Math.pow(10, Math.max(-18, Math.min(12, db)) / 20);
 
@@ -48,7 +53,7 @@ async function fetchBytes(url: string, ms: number): Promise<ArrayBuffer> {
   }
 }
 
-function decode(ctx: BaseAudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
+export function decode(ctx: BaseAudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
   return new Promise((resolve, reject) => {
     // Callback form for old Safari, promise form everywhere else.
     const p = ctx.decodeAudioData(data, resolve, reject) as unknown as Promise<AudioBuffer> | undefined;
@@ -59,6 +64,8 @@ function decode(ctx: BaseAudioContext, data: ArrayBuffer): Promise<AudioBuffer> 
 export class MusicPlayer {
   ctx: AudioContext | null = null;
   private music: GainNode | null = null;
+  private ducking: GainNode | null = null;
+  private duckUntil = 0;
   private fx: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
   private cache = new Map<string, Promise<Loaded>>();
@@ -105,6 +112,7 @@ export class MusicPlayer {
     const ctx = new C({ latencyHint: 'playback' });
     const music = ctx.createGain();
     music.gain.value = this.musicVolume;
+    const ducking = ctx.createGain();
     const fx = ctx.createGain();
     fx.gain.value = this.fxVolume;
     const comp = ctx.createDynamicsCompressor();
@@ -117,12 +125,13 @@ export class MusicPlayer {
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.78;
-    music.connect(comp);
+    music.connect(ducking).connect(comp);
     fx.connect(comp);
     comp.connect(analyser);
     analyser.connect(ctx.destination);
     this.ctx = ctx;
     this.music = music;
+    this.ducking = ducking;
     this.fx = fx;
     this.analyser = analyser;
     return ctx;
@@ -132,6 +141,34 @@ export class MusicPlayer {
   fxOutput(): GainNode | null {
     this.ensureContext();
     return this.fx;
+  }
+
+  /**
+   * Lowers the music for `seconds` (then brings it back smoothly), like a game show does
+   * under its jingles, so that a sound effect is heard over a loud chorus.
+   */
+  duck(seconds: number) {
+    if (this.ctx) this.duckTo(Math.max(this.duckUntil, this.ctx.currentTime + seconds));
+  }
+
+  /** The effect that lowered the music was cut short: the music comes back after `seconds`. */
+  unduck(seconds = 0) {
+    if (this.ctx) this.duckTo(this.ctx.currentTime + seconds);
+  }
+
+  private duckTo(until: number) {
+    const ctx = this.ctx;
+    const g = this.ducking?.gain;
+    if (!ctx || !g) return;
+    const now = ctx.currentTime;
+    this.duckUntil = until;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    if (until > now + DUCK_ATTACK) {
+      g.linearRampToValueAtTime(DUCK_LEVEL, now + DUCK_ATTACK);
+      g.setValueAtTime(DUCK_LEVEL, until);
+    }
+    g.linearRampToValueAtTime(1, Math.max(until, now) + DUCK_RELEASE);
   }
 
   /** Must run inside a user gesture at least once (autoplay policies, iOS unlock). */
