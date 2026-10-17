@@ -10,10 +10,57 @@ test.beforeEach(async ({ page }) => {
 
 const settings = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('sif.settings.v1')!));
 
+test('a new player starts with the tutorial, every time until it is done or skipped', async ({ page }) => {
+  await seed(page, null, { tutorialDone: false });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Iniziamo!' })).toBeVisible();
+  // The home screen is underneath, with its invitation.
+  await page.getByRole('button', { name: 'Indietro' }).click();
+  await expect(page.getByRole('button', { name: /Impara a giocare/ })).toBeVisible();
+  // Left without playing: next time it opens with the tutorial again…
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Iniziamo!' })).toBeVisible();
+  // …where the Android back button leads home too, and from there out of the app.
+  const back = () => page.evaluate(() => (window as unknown as { sifBack: () => string }).sifBack());
+  expect(await back()).toBe('handled');
+  await expect(page.getByRole('button', { name: /Impara a giocare/ })).toBeVisible();
+  expect(await back()).toBe('exit');
+});
+
+const played = {
+  // A finished game in the history…
+  'sif.history.v1': [
+    {
+      id: 'g1',
+      startedAt: 1,
+      endedAt: 2,
+      mode: 'classic',
+      target: 10,
+      reason: 'target',
+      turns: 20,
+      winners: ['Anna'],
+      players: [{ name: 'Anna', avatar: '🐱', color: '#ff4f9a', cards: 10, tokens: 1, correct: 9, placed: 10, steals: 0, bestStreak: 5 }],
+    },
+  ],
+  // …or only the players of a game (the history was cleared).
+  'sif.roster.v1': [{ name: 'Anna', avatar: '🐱', color: '#ff4f9a' }],
+};
+
+for (const [key, value] of Object.entries(played)) {
+  test(`who has already played is not sent to the tutorial, only invited (${key})`, async ({ page }) => {
+    await seed(page, null, { tutorialDone: false });
+    await page.addInitScript(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [key, value] as const);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: /Impara a giocare/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Iniziamo!' })).toHaveCount(0);
+  });
+}
+
 test('the tutorial teaches by playing, and leaves the saved game alone', async ({ page }) => {
   const game = makeGame();
   await seed(page, game, { tutorialDone: false });
   await page.goto('/');
+  // A game in progress: not a new player, the tutorial is offered on the home screen.
   await page.getByRole('button', { name: /Impara a giocare/ }).click();
   await toFirstReveal(page);
   await toFinish(page);
@@ -30,7 +77,6 @@ test('the tutorial teaches by playing, and leaves the saved game alone', async (
 test('wrong answers in the tutorial: the card is discarded, the token lost', async ({ page }) => {
   await seed(page, null, { tutorialDone: false });
   await page.goto('/');
-  await page.getByRole('button', { name: /Impara a giocare/ }).click();
   await toFirstReveal(page);
 
   await page.getByRole('button', { name: /Pesca la sigla/ }).click();
@@ -55,12 +101,14 @@ test('wrong answers in the tutorial: the card is discarded, the token lost', asy
   await page.getByRole('button', { name: 'Indietro' }).click();
   await expect(page.getByRole('button', { name: /Nuova partita/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Impara a giocare/ })).toHaveCount(0);
+  // And the next launch opens on the home screen.
+  await page.reload();
+  await expect(page.getByRole('button', { name: /Nuova partita/ })).toBeVisible();
 });
 
 test('a song that fails to load in the tutorial can be played again', async ({ page }) => {
   await seed(page, null, { tutorialDone: false });
   await page.goto('/');
-  await page.getByRole('button', { name: /Impara a giocare/ }).click();
   await page.getByRole('button', { name: 'Iniziamo!' }).click();
   await page.getByRole('button', { name: 'Ho capito' }).click();
   music.failing = true;
@@ -75,7 +123,6 @@ test('a song that fails to load in the tutorial can be played again', async ({ p
 test('the tutorial can be skipped, and is still there in the rules', async ({ page }) => {
   await seed(page, null, { tutorialDone: false });
   await page.goto('/');
-  await page.getByRole('button', { name: /Impara a giocare/ }).click();
   await page.getByRole('button', { name: 'Salta' }).click();
   await expect(page.getByRole('button', { name: /Nuova partita/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Impara a giocare/ })).toHaveCount(0);
@@ -84,4 +131,7 @@ test('the tutorial can be skipped, and is still there in the rules', async ({ pa
   await page.getByRole('button', { name: /Come si gioca/ }).click();
   await page.getByRole('button', { name: /tutorial interattivo/ }).click();
   await expect(page.getByRole('button', { name: 'Iniziamo!' })).toBeVisible();
+  // Skipped for good: the next launch opens on the home screen.
+  await page.reload();
+  await expect(page.getByRole('button', { name: /Nuova partita/ })).toBeVisible();
 });

@@ -109,7 +109,12 @@ export class MusicPlayer {
     if (this.ctx) return this.ctx;
     const C = audioContextCtor();
     if (!C) return null;
-    const ctx = new C({ latencyHint: 'playback' });
+    let ctx: AudioContext;
+    try {
+      ctx = new C({ latencyHint: 'playback' });
+    } catch {
+      return null; // refused (no audio device, Web Audio disabled…): songs fall back to <audio>
+    }
     const music = ctx.createGain();
     music.gain.value = this.musicVolume;
     const ducking = ctx.createGain();

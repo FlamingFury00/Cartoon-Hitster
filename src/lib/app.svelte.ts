@@ -13,8 +13,8 @@ import * as store from './storage';
 export type Screen = 'home' | 'setup' | 'game' | 'tutorial' | 'rules' | 'settings' | 'history' | 'deck';
 
 const UNDO_LIMIT = 12;
-/** Screens with the main theme playing (the game, the tutorial and the deck play songs). */
-const MENU_SCREENS = new Set<Screen>(['home', 'setup', 'rules', 'settings', 'history']);
+/** Screens with the main theme playing: not the game and the deck, which play songs (nor the lesson of the tutorial). */
+const MENU_SCREENS = new Set<Screen>(['home', 'setup', 'tutorial', 'rules', 'settings', 'history']);
 
 function toast(msg: string, kind: 'info' | 'warn' = 'info') {
   app.toasts = [...app.toasts, { id: Date.now() + Math.random(), msg, kind }];
@@ -54,6 +54,8 @@ class App {
   private unwinding = false;
   /** Rules or settings opened from a running game: the theme stays off there. */
   private detour = false;
+  /** The tutorial between its introduction and its end, where it plays songs: no theme there. */
+  private lesson = false;
   private themeQueued = false;
 
   constructor() {
@@ -68,9 +70,13 @@ class App {
       player.onChange(() => this.updateTheme());
       // Android back button (see MainActivity): the app answers 'exit' only on the home screen.
       (window as unknown as { sifBack?: () => string }).sifBack = () => this.handleBack();
-      // The first touch wakes the audio up and decodes the sound effects, so that they are
-      // ready on every screen, the very first tap included. (The full unlock, which on iPhone
-      // takes over the audio like a music app, waits for the game to start.)
+      // With the menu music on, the audio wakes up with the app: the theme is decoded at once
+      // and plays as soon as the platform lets it (right away in the Android app or an installed
+      // web app, at the first touch in a browser tab); the sound effects are decoded next.
+      if (this.settings.menuMusic) void theme.prepare().then(() => preloadSfx());
+      // The first touch lets the audio sound (browsers ask for one) and decodes the sound effects
+      // if they are not ready yet, so that even the very first tap is heard. (The full unlock,
+      // which on iPhone takes over the audio like a music app, waits for the game to start.)
       const firstTouch = () => {
         void player.ensureContext()?.resume().then(
           () => this.updateTheme(),
@@ -79,7 +85,18 @@ class App {
         void preloadSfx();
       };
       for (const type of ['pointerup', 'keydown']) window.addEventListener(type, firstTouch, { once: true, capture: true });
+      // A new player starts with the tutorial, above the home screen: "back" (its arrow, the
+      // Android back button) leads there. A browser's own Back button does so once the screen
+      // has been touched: browsers skip history entries added before any touch.
+      if (this.newPlayer()) this.go('tutorial');
     }
+  }
+
+  /** Nobody has played on this device yet, nor finished or skipped the tutorial. */
+  private newPlayer(): boolean {
+    if (this.settings.tutorialDone || this.game) return false;
+    // The players of the last game are kept even when the history is cleared.
+    return store.loadRoster().length === 0 && store.loadHistory().length === 0;
   }
 
   // ---------------------------------------------------------------- navigation
@@ -176,10 +193,17 @@ class App {
 
   private applyTheme() {
     const menu = MENU_SCREENS.has(this.screen) && !this.detour;
+    const lesson = this.screen === 'tutorial' && this.lesson;
     const quiet = player.state === 'idle' || player.state === 'error';
-    if (this.settings.menuMusic && menu && quiet && document.visibilityState === 'visible') theme.play();
+    if (this.settings.menuMusic && menu && !lesson && quiet && document.visibilityState === 'visible') theme.play();
     // Out of the menus (or switched off) its decoded audio is dropped too.
     else theme.stop(!menu || !this.settings.menuMusic);
+  }
+
+  /** Called by the tutorial: its lesson (with songs) starts or ends. */
+  setLesson(on: boolean) {
+    this.lesson = on;
+    this.updateTheme();
   }
 
   // ---------------------------------------------------------------- settings

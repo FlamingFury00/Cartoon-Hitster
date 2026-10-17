@@ -1,6 +1,8 @@
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import theme from '../../src/assets/music/theme.json';
+import { mp3Head } from '../../src/lib/audio/mp3';
+import { planHandoff } from '../../src/lib/audio/theme';
 import { songsById } from '../../src/lib/deckdata';
 import { insertSorted } from '../../src/lib/game/timeline';
 import { BRUNO, TUTORIAL as T, YOU, rightSlot } from '../../src/lib/tutorial';
@@ -46,5 +48,80 @@ describe('main theme', () => {
     // 128 kb/s: 16000 bytes per second.
     const seconds = statSync(new URL(`../../src/assets/music/${theme.file}`, import.meta.url)).size / 16000;
     expect(Math.abs(seconds - theme.seconds)).toBeLessThan(0.15);
+  });
+
+  it('can be cut after its first seconds, on a frame', () => {
+    const bytes = new Uint8Array(readFileSync(new URL(`../../src/assets/music/${theme.file}`, import.meta.url)));
+    const head = mp3Head(bytes, 9)!;
+    // The intro and the start of the loop, a sixth of the file.
+    expect(head.seconds).toBeGreaterThan(theme.loop[0] + 2);
+    expect(head.seconds).toBeLessThan(9.05);
+    expect(Math.abs(head.size / 16000 - head.seconds)).toBeLessThan(0.05);
+    // The cut falls between two frames: the next one starts there.
+    expect([bytes[head.size], bytes[head.size + 1] & 0xfe]).toEqual([0xff, 0xfa]);
+    // Every frame of the file is walked through, up to its very end.
+    const all = mp3Head(bytes, theme.seconds)!;
+    expect(bytes.length - all.size).toBeLessThan(1000);
+    expect(mp3Head(bytes, theme.seconds + 1)).toBeNull();
+  });
+});
+
+describe('the whole theme taking over from its first seconds', () => {
+  const rate = 48000;
+  const startedAt = 0.3;
+  const end = 8.94; // where the audio of the first seconds ends, into the theme
+  const plan = (at: number) => planHandoff(startedAt + at - 0.2, startedAt, end, rate);
+
+  it('goes on from where they are, on the sample grid of their start', () => {
+    const p = planHandoff(0.512345, startedAt, end, rate);
+    const frames = p.offset * rate;
+    expect(Math.abs(frames - Math.round(frames))).toBeLessThan(1e-6);
+    expect(p.when - startedAt).toBeCloseTo(p.offset, 12);
+    // A moment ahead, for the start to be kept to the sample.
+    expect(p.when - 0.512345).toBeGreaterThanOrEqual(0.2);
+    expect(p.when - 0.512345).toBeLessThan(0.2 + 1 / rate);
+    expect(p.fade).toBe(0.05);
+  });
+
+  it('crossfades only while their audio lasts', () => {
+    // Near their end the crossfade gets shorter: it is over exactly when they end.
+    for (const at of [8.7, 8.85, 8.9, 8.93, 8.9399]) {
+      const p = plan(at);
+      expect(p.offset).toBeCloseTo(at, 4);
+      expect(p.offset + p.fade).toBeLessThanOrEqual(end + 1e-9);
+      expect(p.fade).toBeGreaterThan(0);
+    }
+    expect(plan(8.5).fade).toBe(0.05);
+  });
+
+  it('after they ran out, comes back where the music would be, with a gentle fade', () => {
+    const p = plan(9.5);
+    expect(p.offset).toBeCloseTo(9.5, 4);
+    expect(p.fade).toBe(0.3);
+    // Even past the end of the file, inside the loop.
+    const [a, b] = theme.loop;
+    const late = plan(b + 10);
+    expect(late.offset).toBeCloseTo(a + 10, 3);
+  });
+});
+
+describe('mp3Head', () => {
+  // MPEG-1 Layer III, 128 kb/s, 44.1 kHz: frames of 417 bytes (418 with padding), 1152 samples.
+  const frame = (pad = 0) => [0xff, 0xfb, 0x90 | (pad << 1), 0x00, ...new Array(413 + pad).fill(0)];
+
+  it('counts whole frames', () => {
+    const bytes = new Uint8Array([...frame(), ...frame(1), ...frame()]);
+    expect(mp3Head(bytes, 0.02)).toEqual({ size: 417, seconds: 1152 / 44100 });
+    expect(mp3Head(bytes, 0.05)).toEqual({ size: 835, seconds: 2304 / 44100 });
+    expect(mp3Head(bytes, 0.07)?.size).toBe(1252);
+    expect(mp3Head(bytes, 0.08)).toBeNull();
+  });
+
+  it('gives up on anything else', () => {
+    expect(mp3Head(new Uint8Array([0x49, 0x44, 0x33, 4, ...frame()]), 0.01)).toBeNull(); // ID3 tag first
+    expect(mp3Head(new Uint8Array([0xff, 0xf3, 0x90, 0, ...frame()]), 0.01)).toBeNull(); // MPEG-2
+    expect(mp3Head(new Uint8Array([0xff, 0xfb, 0xf0, 0, ...frame()]), 0.01)).toBeNull(); // bad bitrate
+    expect(mp3Head(new Uint8Array(frame()).slice(0, 300), 0.01)).toBeNull(); // cut short
+    expect(mp3Head(new Uint8Array(), 1)).toBeNull();
   });
 });
