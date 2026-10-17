@@ -36,7 +36,7 @@ const shot = async (name) => {
 await page.goto(BASE);
 await page.evaluate(() => {
   localStorage.clear();
-  localStorage.setItem('sif.settings.v1', JSON.stringify({ seenRules: true }));
+  localStorage.setItem('sif.settings.v1', JSON.stringify({ tutorialDone: true }));
   localStorage.setItem(
     'sif.roster.v1',
     JSON.stringify([

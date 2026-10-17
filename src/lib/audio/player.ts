@@ -143,6 +143,12 @@ export class MusicPlayer {
     return this.fx;
   }
 
+  /** Input of the music bus (music volume, ducking, limiter): the menu theme plays through it. */
+  musicOutput(): GainNode | null {
+    this.ensureContext();
+    return this.music;
+  }
+
   /**
    * Lowers the music for `seconds` (then brings it back smoothly), like a game show does
    * under its jingles, so that a sound effect is heard over a loud chorus.

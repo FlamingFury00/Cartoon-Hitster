@@ -1,15 +1,14 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { fade, fly, scale } from 'svelte/transition';
   import { app } from '../../lib/app.svelte';
-  import { sfx, type Roll } from '../../lib/audio/sfx';
+  import { sfx } from '../../lib/audio/sfx';
   import { spotifyUrl } from '../../lib/audio/sources';
   import { song } from '../../lib/deckdata';
   import * as E from '../../lib/game/engine';
   import { describeSlot } from '../../lib/game/timeline';
   import type { GameState } from '../../lib/game/types';
-  import { openExternal, prefersReducedMotion } from '../../lib/platform';
-  import BigCard from './BigCard.svelte';
+  import { openExternal } from '../../lib/platform';
+  import RevealCard, { type Verdict } from './RevealCard.svelte';
   import Confetti from '../ui/Confetti.svelte';
   import Icon from '../ui/Icon.svelte';
 
@@ -23,22 +22,11 @@
   const pro = $derived(game.settings.mode === 'pro');
   const nameOf = (id: string | null) => game.players.find((p) => p.id === id)?.name ?? '';
 
-  let flipped = $state(false);
   let landed = $state(false);
-  /** After the slam, the stamp moves to the corner so year and title stay readable. */
-  let settled = $state(false);
-  let tension = $state(false);
   let confetti = $state(0);
   let guess = $state<E.Guess>({ cartoon: false, performer: false });
-  const timers: ReturnType<typeof setTimeout>[] = [];
-  let roll: Roll | null = null;
 
-  const verdict = $derived.by(() => {
-    if (outcome.bought) return { text: 'COMPRATA!', cls: 'bought' };
-    if (outcome.placementCorrect) return { text: 'GIUSTO!', cls: 'right' };
-    if (outcome.stolenBy) return { text: 'RUBATA!', cls: 'stolen' };
-    return { text: 'SBAGLIATO!', cls: 'wrong' };
-  });
+  const verdict = $derived<Verdict>(outcome.bought ? 'bought' : outcome.placementCorrect ? 'right' : outcome.stolenBy ? 'stolen' : 'wrong');
 
   const yearOf = (id: string) => song(id).year;
   const timeline = $derived(coop && game.team ? game.team.timeline : active.timeline);
@@ -48,46 +36,11 @@
   const showGuess = $derived(!outcome.bought && (game.settings.tokens || pro));
   const tokensNow = $derived(coop && game.team ? game.team.tokens : active.tokens);
 
-  const calm = () => prefersReducedMotion() || app.settings.motion === 'reduced';
-
-  function land() {
-    if (flipped) return; // a second tap while the card turns
-    flipped = true;
-    tension = false;
-    // The drum roll ends on a cymbal crash as the card turns; a card tapped before the roll
-    // started (or with the roll not ready yet) still gets its crash.
-    if (roll) roll.end(true);
-    else if (!calm() && !outcome.bought) sfx.crash();
-    roll = null;
-    timers.push(
-      setTimeout(() => {
-        landed = true;
-        app.revealLanded();
-        if (outcome.bought || outcome.placementCorrect || outcome.stolenBy) confetti++;
-        if (calm()) settled = true;
-        else timers.push(setTimeout(() => (settled = true), 1300));
-      }, 420),
-    );
+  function onlanded() {
+    landed = true;
+    app.revealLanded();
+    if (verdict !== 'wrong') confetti++;
   }
-
-  onMount(() => {
-    if (calm() || outcome.bought) {
-      timers.push(setTimeout(land, outcome.bought ? 300 : 50));
-    } else {
-      timers.push(
-        setTimeout(() => {
-          if (flipped) return; // already revealed with a tap
-          tension = true;
-          roll = sfx.drumroll();
-        }, 380),
-      );
-      timers.push(setTimeout(land, 1450));
-    }
-    return () => {
-      timers.forEach(clearTimeout);
-      roll?.end(false);
-    };
-  });
 
   function toggle(k: keyof E.Guess) {
     guess[k] = !guess[k];
@@ -102,12 +55,7 @@
 <div class="overlay" transition:fade={{ duration: 180 }}>
   <Confetti fire={confetti} />
   <div class="stage scroll">
-    <button class="cardbtn" class:tension aria-label={landed ? 'Carta rivelata' : 'Rivela subito'} onclick={land} in:scale={{ duration: 350, start: 0.6 }}>
-      <BigCard song={s} {flipped} />
-      {#if landed}
-        <div class="stamp {verdict.cls}" class:settled in:scale={{ duration: calm() ? 0 : 420, start: 2.6 }}>{verdict.text}</div>
-      {/if}
-    </button>
+    <RevealCard song={s} {verdict} {onlanded} />
 
     {#if landed}
       <section class="result" in:fly={{ y: 30, duration: 320 }}>
@@ -198,50 +146,6 @@
     align-items: center;
     gap: 16px;
     padding: calc(var(--safe-top) + 18px) 18px calc(var(--safe-bottom) + 18px);
-  }
-  .cardbtn {
-    position: relative;
-    margin-top: 4px;
-  }
-  .cardbtn.tension {
-    animation: shake 0.28s linear infinite;
-  }
-  .stamp {
-    position: absolute;
-    left: 50%;
-    top: 63%;
-    transform: translate(-50%, -50%) rotate(-14deg);
-    padding: 6px 18px 4px;
-    border: 5px solid currentColor;
-    border-radius: 14px;
-    font-family: var(--font-display);
-    font-size: clamp(1.8rem, 9vw, 2.6rem);
-    letter-spacing: 0.04em;
-    background: rgba(255, 248, 234, 0.92);
-    box-shadow: 0 6px 0 var(--ink);
-    white-space: nowrap;
-    pointer-events: none;
-    transition:
-      top 0.5s var(--ease-back),
-      left 0.5s var(--ease-back),
-      transform 0.5s var(--ease-back);
-  }
-  .stamp.settled {
-    top: 8%;
-    left: 74%;
-    transform: translate(-50%, -50%) rotate(10deg) scale(0.5);
-  }
-  .stamp.right {
-    color: #15a33a;
-  }
-  .stamp.wrong {
-    color: #e0213a;
-  }
-  .stamp.stolen {
-    color: #7a3df0;
-  }
-  .stamp.bought {
-    color: #c98a00;
   }
   .result {
     width: min(100%, 440px);

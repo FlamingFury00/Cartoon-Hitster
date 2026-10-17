@@ -22,6 +22,14 @@ aired in Italy and slot the card into your own timeline. First to 10 cards wins.
 Both are published automatically by GitHub Actions on every push to `main`
 (the web version needs GitHub Pages enabled once: *Settings → Pages → Source: GitHub Actions*).
 
+## New players: the tutorial
+
+*Impara a giocare* (on the home screen the first time, then in *Come si gioca*) is a two-minute
+interactive tutorial guided by Nastrina, a talking cassette. You learn by playing a short scripted
+game against Bruno: listen to real themes, place cards on your timeline (helped, then on your own),
+turn them over with the drum roll, win a bonus token and challenge Bruno to steal his card. It uses
+the real components, songs and sounds, and never touches the saved game.
+
 ## How a turn works
 
 1. **Pesca la sigla** — a random song you have not heard recently starts playing. Title, cartoon
@@ -62,16 +70,21 @@ How every year and recording was checked, plus the full list with sources:
 - "🎧 Ascolta tutta la sigla" opens the full song in the Spotify app; a settings switch can play
   every card in Spotify instead (the title is visible there, so it is a fallback only).
 
-## Sound effects
+## Music and sound effects
 
-Real recordings, not synthesised beeps: cards sliding and landing on a table, poker chips for
+The menus play their own theme, **"Happy Happy Game Show" by Kevin MacLeod** (incompetech.com,
+CC BY 4.0): organ, piano, horns, bass and drums, cut into an intro and a seamless 50-second loop
+(two 24-bar choruses at 230 bpm, seam refined by cross-correlation). It fades out when a game
+starts or a song plays, and can be switched off in the settings (*Musica nei menu*).
+
+Sound effects are real recordings, not synthesised beeps: cards sliding and landing on a table, poker chips for
 the tokens, a concert snare roll that loops while the card spins and ends on a cymbal crash,
 a boxing bell for challenges, the classic sad trombone, a crowd going "ooooh" when a card is
 stolen, and a brass fanfare with a small crowd cheering for the winner. The music dips under the
 big moments, like on a game show. All of them are CC0 or public domain, except the sad
 trombone (CC BY 3.0, credited in the app); full list and links in [`CREDITS.md`](CREDITS.md).
-The ~330 kB of MP3s in `src/assets/sfx/` are rebuilt from the original sources with
-`npm run sfx` (ffmpeg needed).
+The ~330 kB of MP3s in `src/assets/sfx/` and the theme in `src/assets/music/` are rebuilt from
+the original sources with `npm run sfx` and `npm run theme` (ffmpeg needed).
 
 ## Development
 
@@ -81,7 +94,7 @@ Requirements: Node 22+, and for the APK a JDK 17+ and the Android SDK (platform 
 npm install
 npm run dev          # http://localhost:5173
 npm run check        # svelte-check (strict TypeScript)
-npm test             # unit tests: rules engine, sound effect files (Vitest)
+npm test             # unit tests: rules engine, tutorial script, audio files (Vitest)
 npm run test:e2e     # Playwright end-to-end tests (music services are mocked)
 npm run build        # production web build in dist/
 npm run apk          # Android APK in android/app/build/outputs/apk/release/
@@ -118,4 +131,4 @@ requires uninstalling the old app once).
 
 A private, non-commercial game for family and friends, inspired by the *Hitster* card game.
 All songs belong to their rights holders; the app only plays the public previews provided
-by Deezer and Spotify. Sound effect and font credits: [`CREDITS.md`](CREDITS.md).
+by Deezer and Spotify. Music, sound effect and font credits: [`CREDITS.md`](CREDITS.md).

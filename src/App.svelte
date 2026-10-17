@@ -6,6 +6,7 @@
   import Home from './components/screens/Home.svelte';
   import Setup from './components/screens/Setup.svelte';
   import Game from './components/game/Game.svelte';
+  import Tutorial from './components/screens/Tutorial.svelte';
   import Rules from './components/screens/Rules.svelte';
   import Settings from './components/screens/Settings.svelte';
   import History from './components/screens/History.svelte';
@@ -28,6 +29,8 @@
       <Setup />
     {:else if app.screen === 'game'}
       <Game />
+    {:else if app.screen === 'tutorial'}
+      <Tutorial />
     {:else if app.screen === 'rules'}
       <Rules />
     {:else if app.screen === 'settings'}

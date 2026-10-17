@@ -1,12 +1,22 @@
 # Credits
 
+## Main theme
+
+The music of the menus is **["Happy Happy Game Show"](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600006)
+by Kevin MacLeod ([incompetech.com](https://incompetech.com))**, licensed under
+[Creative Commons: By Attribution 4.0](https://creativecommons.org/licenses/by/4.0/). It was cut into an
+intro and a seamless loop and loudness-normalised for the game by
+[`tools/assets/theme.mjs`](tools/assets/theme.mjs), which writes
+[`src/assets/music/`](src/assets/music). The credit is also shown in the app
+(*Impostazioni → Informazioni → Crediti di musica ed effetti sonori*).
+
 ## Sound effects
 
 Every sound effect in the game is a real recording with a free licence. They are cut, cleaned
 (high-pass, silence trimmed, short fades), loudness-matched and encoded as small mono MP3s by
 [`tools/assets/sfx.mjs`](tools/assets/sfx.mjs), which downloads the sources below and writes
 [`src/assets/sfx/`](src/assets/sfx). The same credits are shown in the app
-(*Impostazioni → Informazioni → Crediti degli effetti sonori*).
+(*Impostazioni → Informazioni → Crediti di musica ed effetti sonori*).
 
 | In the game | Recording | Author | Licence |
 |---|---|---|---|
@@ -23,7 +33,7 @@ Every sound effect in the game is a real recording with a free licence. They are
 | Victory fanfare | [Classic fanfare lick](https://opengameart.org/content/classic-fanfare-lick) | fvcalderan | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | Wrong answer (sad trombone) | [Sad Trombone](https://soundbible.com/1830-Sad-Trombone.html) ([Commons copy](https://commons.wikimedia.org/wiki/File:Sad_Trombone-Joe_Lamb-665429450.ogg)) | Joe Lamb | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) — trimmed, filtered and normalised for the game |
 
-## Music
+## The songs of the game
 
 The theme songs are not part of the app: they play from the public 30-second previews that
 Deezer and Spotify serve to everyone, and belong to their rights holders.

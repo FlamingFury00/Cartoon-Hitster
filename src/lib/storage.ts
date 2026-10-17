@@ -49,8 +49,11 @@ export interface AppSettings {
   source: SourcePreference;
   playback: 'preview' | 'spotify';
   autoLoop: boolean;
+  /** Main theme on the menu screens. */
+  menuMusic: boolean;
   game: GameSettings;
-  seenRules: boolean;
+  /** The interactive tutorial was completed (or skipped): Home stops inviting to it. */
+  tutorialDone: boolean;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -63,8 +66,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   source: 'auto',
   playback: 'preview',
   autoLoop: true,
+  menuMusic: true,
   game: DEFAULT_SETTINGS,
-  seenRules: false,
+  tutorialDone: false,
 };
 
 export function loadSettings(): AppSettings {

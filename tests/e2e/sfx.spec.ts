@@ -41,10 +41,16 @@ test('every sound effect is bundled and decodes', async ({ page }) => {
   await seed(page, null);
   await page.goto('/');
   await page.getByRole('button', { name: /Nuova partita/ }).click();
-  const files = Object.values(manifest).flatMap((e) => e.files).length;
+  // Bundled as assets/<name>-<hash>.mp3 (next to the menu theme, which is not counted here).
+  const stems = Object.values(manifest).flatMap((e) => e.files.map((f) => f.replace(/\.mp3$/, '-')));
   await expect
-    .poll(() => page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/assets\/[^/]+\.mp3$/.test(e.name)).length))
-    .toBe(files);
+    .poll(() =>
+      page.evaluate(
+        (stems) => performance.getEntriesByType('resource').filter((e) => stems.some((s) => e.name.split('/').pop()!.startsWith(s))).length,
+        stems,
+      ),
+    )
+    .toBe(stems.length);
   expect(failed).toEqual([]);
   // The very first tap already has its sound (a "pop"), even though the audio was asleep.
   await expect.poll(async () => (await played(page)).map(effect)).toContain('pop');

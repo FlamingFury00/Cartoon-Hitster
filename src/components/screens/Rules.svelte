@@ -1,10 +1,14 @@
 <script lang="ts">
+  import { app } from '../../lib/app.svelte';
+  import { sfx } from '../../lib/audio/sfx';
   import TopBar from '../ui/TopBar.svelte';
 </script>
 
 <TopBar title="Come si gioca" />
 
 <div class="rules scroll">
+  <button class="btn green wide learn" onclick={() => (sfx.pop(), app.go('tutorial'))}>🎓 Prova il tutorial interattivo · 2 min</button>
+
   <article class="panel">
     <h2>🎯 Lo scopo</h2>
     <p>
@@ -71,6 +75,10 @@
     flex-direction: column;
     gap: 14px;
     padding: 4px 16px 28px;
+  }
+  .learn {
+    width: min(100%, 600px);
+    margin: 0 auto;
   }
   .panel {
     width: min(100%, 600px);

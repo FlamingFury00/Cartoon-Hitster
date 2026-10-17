@@ -45,7 +45,7 @@ export async function seed(page: Page, game: GameState | null, settings: Record<
       sessionStorage.setItem('seeded', '1');
       localStorage.clear();
       if (g) localStorage.setItem('sif.game.v1', JSON.stringify(g));
-      localStorage.setItem('sif.settings.v1', JSON.stringify({ seenRules: true, ...s }));
+      localStorage.setItem('sif.settings.v1', JSON.stringify({ tutorialDone: true, ...s }));
     },
     [game, settings] as const,
   );

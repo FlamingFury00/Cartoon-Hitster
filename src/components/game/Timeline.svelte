@@ -28,6 +28,7 @@
     validRange,
     revealState,
     owner,
+    highlight,
     onSlot,
     scroller,
   }: {
@@ -42,6 +43,8 @@
     revealState?: 'right' | 'wrong' | 'stolen' | 'bought';
     /** Avatar/colour of the player who placed the mystery card (challenge mode). */
     owner?: { avatar: string; color: string };
+    /** A slot that pulses to draw the eye (the tutorial points at it). */
+    highlight?: number;
     onSlot?: (slot: number) => void;
     /** Scrollable ancestor, used for auto-scroll while dragging. */
     scroller?: HTMLElement;
@@ -151,6 +154,7 @@
     if (mode === 'place') c.push('open');
     if (mode === 'challenge' && tappable.includes(s)) c.push('open', 'challenge');
     if (hover === s) c.push('hover');
+    if (highlight === s) c.push('spot');
     if (mode === 'reveal' && validRange && revealState === 'wrong' && s >= validRange[0] && s <= validRange[1]) c.push('valid');
     if (mode === 'reveal' && validRange && revealState === 'stolen' && s >= validRange[0] && s <= validRange[1]) c.push('valid');
     return c.join(' ');
@@ -303,6 +307,19 @@
     height: 58px;
     border-color: var(--yellow);
     background: rgba(255, 210, 63, 0.22);
+  }
+  .slot.spot {
+    border-color: var(--yellow);
+    background: rgba(255, 210, 63, 0.18);
+    animation: spot 1.1s ease-in-out infinite;
+  }
+  .slot.spot .plus {
+    background: var(--yellow);
+  }
+  @keyframes spot {
+    50% {
+      box-shadow: 0 0 0 6px rgba(255, 210, 63, 0.35);
+    }
   }
   .slot.valid {
     height: 40px;

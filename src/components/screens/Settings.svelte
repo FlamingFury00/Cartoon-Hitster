@@ -62,6 +62,10 @@
       <input type="range" min="0" max="100" value={Math.round(app.settings.musicVolume * 100)} oninput={(e) => vol('musicVolume', e)} />
     </label>
     <div class="opt">
+      <div><strong>Musica nei menu</strong><small>La sigla del gioco, finché non si gioca</small></div>
+      <Toggle bind:checked={app.settings.menuMusic} label="Musica nei menu" onchange={save} />
+    </div>
+    <div class="opt">
       <div><strong>Effetti sonori</strong><small>Rullo di tamburi, applausi, trombone triste…</small></div>
       <Toggle bind:checked={app.settings.sfx} label="Effetti sonori" onchange={() => (save(), sfx.pop())} />
     </div>
@@ -126,9 +130,13 @@
       {isAndroidApp ? 'Versione Android.' : 'Versione web: puoi installarla dal menu del browser ("Aggiungi a schermata Home").'}
     </p>
     <details class="credits small">
-      <summary>🎺 Crediti degli effetti sonori</summary>
+      <summary>🎺 Crediti di musica ed effetti sonori</summary>
       <p>Registrazioni vere con licenza libera, accorciate e normalizzate per il gioco:</p>
       <ul>
+        <li>
+          Musica dei menu: «<a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600006" target="_blank" rel="noopener noreferrer">Happy Happy Game Show</a>» di Kevin MacLeod (incompetech.com), licenza
+          <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>
+        </li>
         <li>Carte, fiches, monete, clic e jingle: <a href="https://kenney.nl/assets" target="_blank" rel="noopener noreferrer">Kenney</a> (CC0)</li>
         <li>Rullo di tamburi: United States Air Force Band (pubblico dominio)</li>
         <li>Piatto, «pop», applausi e «ooh» del pubblico: aradlaw, cori, starlite su pdsounds.org (pubblico dominio)</li>
