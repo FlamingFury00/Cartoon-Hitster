@@ -1,9 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 
-/** From the tutorial's welcome screen to the end of the guided card. */
-export async function toFirstReveal(page: Page) {
+/** From the tutorial's welcome screen to the start of its lesson (the first card to draw). */
+export async function toLesson(page: Page) {
   await page.getByRole('button', { name: 'Iniziamo!' }).click();
   await page.getByRole('button', { name: 'Ho capito' }).click();
+}
+
+/** The guided card of the lesson, up to its reveal. */
+export async function firstCard(page: Page) {
   await page.getByRole('button', { name: /Pesca la sigla/ }).click();
   // The song plays, with the transport of the real game.
   await expect(page.getByRole('button', { name: 'Pausa', exact: true })).toBeVisible();
@@ -14,6 +18,12 @@ export async function toFirstReveal(page: Page) {
   await page.getByRole('button', { name: /Conferma/ }).click();
   await expect(page.getByText('GIUSTO!', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Avanti' }).click();
+}
+
+/** From the tutorial's welcome screen to the end of the guided card. */
+export async function toFirstReveal(page: Page) {
+  await toLesson(page);
+  await firstCard(page);
 }
 
 /** The rest of the tutorial with the right answers, up to its last screen. */

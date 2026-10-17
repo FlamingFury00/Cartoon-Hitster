@@ -24,11 +24,13 @@ Both are published automatically by GitHub Actions on every push to `main`
 
 ## New players: the tutorial
 
-*Impara a giocare* (on the home screen the first time, then in *Come si gioca*) is a two-minute
-interactive tutorial guided by Nastrina, a talking cassette. You learn by playing a short scripted
-game against Bruno: listen to real themes, place cards on your timeline (helped, then on your own),
-turn them over with the drum roll, win a bonus token and challenge Bruno to steal his card. It uses
-the real components, songs and sounds, and never touches the saved game.
+*Impara a giocare* is a two-minute interactive tutorial guided by Nastrina, a talking cassette.
+It opens by itself when a new player opens the app, until it is finished or skipped (anyone who
+has already played finds it on the home screen instead; it is always in *Come si gioca*). You
+learn by playing a short scripted game against Bruno: listen to real themes, place cards on your
+timeline (helped, then on your own), turn them over with the drum roll, win a bonus token and
+challenge Bruno to steal his card. It uses the real components, songs and sounds, and never
+touches the saved game. The main theme welcomes you and comes back at the end.
 
 ## How a turn works
 
@@ -74,8 +76,11 @@ How every year and recording was checked, plus the full list with sources:
 
 The menus play their own theme, **"Happy Happy Game Show" by Kevin MacLeod** (incompetech.com,
 CC BY 4.0): organ, piano, horns, bass and drums, cut into an intro and a seamless 50-second loop
-(two 24-bar choruses at 230 bpm, seam refined by cross-correlation). It fades out when a game
-starts or a song plays, and can be switched off in the settings (*Musica nei menu*).
+(two 24-bar choruses at 230 bpm, seam refined by cross-correlation). It starts with the app: it
+is decoded at launch, its first seconds on their own first (a sixth of the decoding time), so it
+plays at once and the whole theme takes over on the very same sample. The Android app plays it
+right away; a browser waits for the first touch, then it starts instantly. It fades out when a
+game starts or a song plays, and can be switched off in the settings (*Musica nei menu*).
 
 Sound effects are real recordings, not synthesised beeps: cards sliding and landing on a table, poker chips for
 the tokens, a concert snare roll that loops while the card spins and ends on a cymbal crash,

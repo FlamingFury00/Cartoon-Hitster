@@ -37,6 +37,8 @@
     finish: 5,
   };
   const CHAPTERS = ['La fila', 'Ascolta', 'Da solo', 'Gettoni', 'Sfida', 'Fine'];
+  /** Steps with the main theme, as in the menus: before the lesson (with its songs) and after it. */
+  const THEMED = new Set<Step>(['welcome', 'timeline', 'finish']);
 
   const yearOf = (id: string) => song(id).year;
   const first = song(T.first);
@@ -71,6 +73,7 @@
   onDestroy(() => {
     clearTimeout(readyTimer);
     player.stop();
+    app.setLesson(false);
   });
 
   const listening = $derived(step === 'place1' || step === 'place2' || step === 'rival');
@@ -80,6 +83,7 @@
 
   function goTo(next: Step) {
     step = next;
+    app.setLesson(!THEMED.has(next));
     landed = false;
     stage?.scrollTo({ top: 0 });
     ready = false;
