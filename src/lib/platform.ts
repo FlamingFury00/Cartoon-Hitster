@@ -83,8 +83,15 @@ export function openExternal(url: string) {
     bridge.openExternal(url);
     return;
   }
-  const w = window.open(url, '_blank', 'noopener,noreferrer');
-  if (!w) location.href = url;
+  // A link click opens a new tab (or the Spotify app) and never replaces the game tab.
+  // (window.open with "noopener" always returns null, so it cannot detect a blocked popup.)
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 export function prefersReducedMotion(): boolean {

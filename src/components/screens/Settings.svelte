@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { app, toast } from '../../lib/app.svelte';
   import { player } from '../../lib/audio/player';
   import { sfx } from '../../lib/audio/sfx';
@@ -10,6 +11,16 @@
 
   let testing = $state(false);
   let confirmReset = $state(false);
+  let testTimer: ReturnType<typeof setTimeout> | undefined;
+  let testSong: string | null = null;
+
+  // The test song must never cut a game song: stop it only if it is still the one playing.
+  const stopTest = () => {
+    clearTimeout(testTimer);
+    if (testSong && player.songId === testSong) player.stop();
+    testSong = null;
+  };
+  onDestroy(stopTest);
   const save = () => app.saveSettings();
 
   function vol(key: 'musicVolume' | 'sfxVolume', e: Event) {
@@ -21,11 +32,13 @@
     testing = true;
     player.unlock();
     const s = songs.find((x) => x.fame === 3) ?? songs[0];
+    stopTest();
+    testSong = s.id;
     try {
       await player.play(s);
       const names: Record<string, string> = { dz: 'Deezer', it: 'iTunes', sp: 'Spotify' };
       toast(`Audio OK (sorgente: ${names[player.sourceKind() ?? ''] ?? '?'}) — si ferma tra 6 secondi`);
-      setTimeout(() => player.stop(), 6000);
+      testTimer = setTimeout(stopTest, 6000);
     } catch {
       toast('Non riesco a riprodurre l\'audio: controlla la connessione', 'warn');
     } finally {

@@ -94,7 +94,15 @@
 
   function start() {
     if (!valid) return;
-    const named = players.map((p, i) => ({ ...p, name: p.name.trim() || `Giocatore ${i + 1}` }));
+    // Every player needs a distinct name (scores, history and challenges refer to it).
+    const taken = new Set<string>();
+    const named = players.map((p, i) => {
+      const base = p.name.trim() || `Giocatore ${i + 1}`;
+      let name = base;
+      for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}`;
+      taken.add(name.toLowerCase());
+      return { ...p, name };
+    });
     app.newGame(named, $state.snapshot(s) as GameSettings);
   }
 

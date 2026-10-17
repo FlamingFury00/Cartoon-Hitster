@@ -35,11 +35,14 @@ function audioContextCtor(): Ctor | null {
   return w.AudioContext ?? w.webkitAudioContext ?? null;
 }
 
-async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
+/** Downloads a whole file; the timeout also covers the body (a stalled transfer must fail). */
+async function fetchBytes(url: string, ms: number): Promise<ArrayBuffer> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
-    return await fetch(url, { mode: 'cors', credentials: 'omit', signal: ctrl.signal, referrerPolicy: 'no-referrer' });
+    const res = await fetch(url, { mode: 'cors', credentials: 'omit', signal: ctrl.signal, referrerPolicy: 'no-referrer' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.arrayBuffer();
   } finally {
     clearTimeout(t);
   }
@@ -69,7 +72,12 @@ export class MusicPlayer {
   private startedAt = 0;
   private offset = 0;
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Bumped by every transport action: a pending start belonging to an older one is dropped. */
   private request = 0;
+  /** The app was hidden while the song was loading: start paused instead of playing. */
+  private startPaused = false;
+  /** Song requested by the latest play() (null after stop()). */
+  songId: string | null = null;
 
   state: PlaybackState = 'idle';
   error: string | null = null;
@@ -174,9 +182,7 @@ export class MusicPlayer {
         source = await candidate();
         if (!source) continue;
         if (ctx) {
-          const res = await fetchWithTimeout(source.url, FETCH_TIMEOUT);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.arrayBuffer();
+          const data = await fetchBytes(source.url, FETCH_TIMEOUT);
           const buffer = await decode(ctx, data);
           if (buffer.duration < 4) throw new Error('preview troppo corta');
           return { source, buffer, element: null };
@@ -243,6 +249,8 @@ export class MusicPlayer {
   /** Plays a song from the beginning. Resolves once audio is actually playing. */
   async play(song: Song): Promise<void> {
     const req = ++this.request;
+    this.songId = song.id;
+    this.startPaused = false;
     this.unlock();
     this.halt(false);
     this.error = null;
@@ -258,16 +266,24 @@ export class MusicPlayer {
     }
     if (req !== this.request) return;
     this.current = { id: song.id, loaded };
-    await this.startAt(loaded.source.skip);
+    if (this.startPaused) {
+      this.startPaused = false;
+      this.offset = loaded.source.skip;
+      this.setState('paused');
+      return;
+    }
+    await this.startAt(loaded.source.skip, req);
   }
 
-  private async startAt(offset: number) {
+  private async startAt(offset: number, req: number) {
     const cur = this.current;
     const ctx = this.ctx;
     if (!cur) return;
     this.clearLoopTimer();
     if (cur.loaded.buffer && ctx) {
       if (ctx.state !== 'running') await ctx.resume().catch(() => {});
+      // Another action (stop, skip, pause…) happened while the context was waking up.
+      if (req !== this.request || this.current !== cur) return;
       const buffer = cur.loaded.buffer;
       const start = Math.max(0, Math.min(offset, buffer.duration - 1));
       const node = ctx.createBufferSource();
@@ -291,7 +307,7 @@ export class MusicPlayer {
         this.offset = 0;
         if (this.autoLoop && this.current === cur) {
           this.loopTimer = setTimeout(() => {
-            if (this.current === cur && this.state === 'playing') void this.startAt(cur.loaded.source.skip);
+            if (this.current === cur && this.state === 'playing') void this.startAt(cur.loaded.source.skip, this.request);
           }, LOOP_GAP_MS);
         } else this.setState('paused');
       };
@@ -310,6 +326,10 @@ export class MusicPlayer {
       el.currentTime = offset;
       el.onended = () => this.setState('paused');
       await el.play();
+      if (req !== this.request || this.current !== cur) {
+        el.pause();
+        return;
+      }
       this.setState('playing');
     }
   }
@@ -340,7 +360,12 @@ export class MusicPlayer {
   }
 
   pause() {
+    if (this.state === 'loading') {
+      this.startPaused = true; // e.g. the app went to the background while loading
+      return;
+    }
     if (this.state !== 'playing') return;
+    this.request++;
     this.offset = this.position();
     this.halt(true);
     this.setState('paused');
@@ -348,11 +373,12 @@ export class MusicPlayer {
 
   async resume() {
     if (this.state !== 'paused' || !this.current) return;
+    const req = ++this.request;
     this.unlock();
-    if (this.current.loaded.buffer) await this.startAt(this.offset);
+    if (this.current.loaded.buffer) await this.startAt(this.offset, req);
     else if (this.element) {
       await this.element.play();
-      this.setState('playing');
+      if (req === this.request) this.setState('playing');
     }
   }
 
@@ -363,13 +389,16 @@ export class MusicPlayer {
 
   async restart() {
     if (!this.current) return;
+    const req = ++this.request;
     this.unlock();
     this.halt(true);
-    await this.startAt(this.current.loaded.source.skip);
+    await this.startAt(this.current.loaded.source.skip, req);
   }
 
   stop() {
     this.request++;
+    this.songId = null;
+    this.startPaused = false;
     this.halt(false);
     this.setState('idle');
   }

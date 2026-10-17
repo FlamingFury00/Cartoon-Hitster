@@ -25,7 +25,7 @@ import androidx.webkit.WebViewClientCompat
  * Hosts the "Sigle in Fila" web app. The game is bundled in assets/www and served from
  * https://appassets.androidplatform.net so it behaves like a normal secure web origin
  * (localStorage, fetch, Web Audio) while working fully offline; only the 30-second music
- * previews are streamed from Deezer / iTunes.
+ * previews are streamed from Deezer / Spotify.
  */
 class MainActivity : ComponentActivity() {
 
@@ -88,9 +88,11 @@ class MainActivity : ComponentActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                // The web app keeps its own screen history (history.pushState): going back
-                // inside the WebView opens the pause menu during a game, or the previous screen.
-                if (webView.canGoBack()) webView.goBack() else finish()
+                // The web app decides (window.sifBack): previous screen, pause menu during a
+                // game, and "exit" only on the home screen. No answer (page not loaded) = exit.
+                webView.evaluateJavascript("window.sifBack ? window.sifBack() : 'exit'") { result ->
+                    if (result == null || result == "null" || result.trim('"') == "exit") finish()
+                }
             }
         })
 

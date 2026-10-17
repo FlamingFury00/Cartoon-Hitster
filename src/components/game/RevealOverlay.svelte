@@ -117,8 +117,9 @@
           <ul class="challenges">
             {#each phase.challenges as c (c.playerId)}
               {@const p = game.players.find((x) => x.id === c.playerId)}
-              {@const ok = c.slot >= outcome.validFrom && c.slot <= outcome.validTo}
+              {@const ok = outcome.stolenBy === c.playerId}
               {#if p}
+                <!-- Only the thief wins: every other challenger has spent the token. -->
                 <li class:ok>{p.avatar} {p.name}: {ok ? 'sfida vinta' : 'sfida persa'} {ok ? '✓' : '✗'}</li>
               {/if}
             {/each}
@@ -152,7 +153,7 @@
           {:else if dest}
             La carta va nella fila di <b>{nameOf(dest)}</b>.
           {:else if coop}
-            Carta scartata: la squadra perde un gettone {game.team && game.team.tokens === 0 ? '…ed è finita!' : ''}
+            Carta scartata: la squadra perde un gettone{game.team && game.team.tokens === 0 ? (earns ? ', ma quello bonus vi salva!' : '… ed è finita!') : '.'}
           {:else}
             La carta viene scartata.
           {/if}
@@ -161,6 +162,9 @@
         <div class="actions">
           <button class="btn big wide green" onclick={next}>Avanti <Icon name="play" /></button>
           <button class="btn small ghost" onclick={() => openExternal(spotifyUrl(s))}>🎧 Ascolta tutta la sigla su Spotify <Icon name="external" size={16} /></button>
+          {#if app.canUndo}
+            <button class="btn small ghost" aria-label="Annulla l'ultima mossa" onclick={() => app.undo()}><Icon name="undo" size={16} /> Annulla la mossa</button>
+          {/if}
         </div>
       </section>
     {/if}

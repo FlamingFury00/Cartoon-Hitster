@@ -54,6 +54,22 @@
     }
   }
 
+  // "Gira la carta!" appears where "Conferma" was: ignore it for a moment so that a double tap
+  // on Conferma does not skip the challenge window.
+  const inChallenge = $derived(phase.t === 'challenge');
+  let flipArmed = $state(true);
+  $effect(() => {
+    if (!inChallenge) return;
+    flipArmed = false;
+    const t = setTimeout(() => (flipArmed = true), 500);
+    return () => clearTimeout(t);
+  });
+
+  // Nothing loaded (stopped, or the last attempt failed): load the current card again.
+  const idle = () => pstate === 'idle' || pstate === 'error';
+  const playPause = () => (idle() ? app.replayCurrent() : player.toggle());
+  const restart = () => (idle() ? app.replayCurrent() : player.restart());
+
   function pickChallenger(id: string) {
     challenger = challenger === id ? null : id;
   }
@@ -77,7 +93,7 @@
   });
 </script>
 
-<div class="play">
+<div class="play" class:challenging={phase.t === 'challenge'}>
   <section class="deckpanel">
     <div class="tape">
       <Cassette label={phase.t === 'reveal' ? song(phase.card).cartoon.toUpperCase().slice(0, 22) : 'SIGLA MISTERIOSA'} side={String((game.turn % 2) ? 'B' : 'A')} />
@@ -87,10 +103,10 @@
         <button class="btn small green" onclick={() => openExternal(spotifyUrl(song(phase.card)))}>🎧 Riapri Spotify</button>
       {:else}
         <div class="transport">
-          <button class="icon-btn big" aria-label={pstate === 'playing' ? 'Pausa' : 'Riproduci'} onclick={() => player.toggle()} disabled={pstate === 'loading' || pstate === 'error' || pstate === 'idle'}>
+          <button class="icon-btn big" aria-label={pstate === 'playing' ? 'Pausa' : 'Riproduci'} onclick={playPause} disabled={pstate === 'loading'}>
             <Icon name={pstate === 'playing' ? 'pause' : 'play'} size={28} />
           </button>
-          <button class="icon-btn" aria-label="Ricomincia la sigla" onclick={() => player.restart()} disabled={pstate === 'loading' || pstate === 'error' || pstate === 'idle'}>
+          <button class="icon-btn" aria-label="Ricomincia la sigla" onclick={restart} disabled={pstate === 'loading'}>
             <Icon name="replay" />
           </button>
         </div>
@@ -177,7 +193,7 @@
           {/each}
         </div>
       {/if}
-      <button class="btn big wide green" onclick={() => app.reveal()}>🃏 Gira la carta!</button>
+      <button class="btn big wide green" disabled={!flipArmed} onclick={() => app.reveal()}>🃏 Gira la carta!</button>
     </footer>
   {/if}
 </div>
@@ -251,7 +267,8 @@
   }
   .tl {
     flex: 1;
-    min-height: 0;
+    /* never squeezed away, even with six players in the challenge window */
+    min-height: 110px;
     padding: 4px 14px 10px;
     max-width: 620px;
     width: 100%;
@@ -280,11 +297,35 @@
     animation: wiggle 0.9s ease-in-out infinite;
     display: inline-block;
   }
+  /* One row that scrolls sideways: with 5-6 players a wrapping list would eat the timeline. */
   .challengers {
     display: flex;
-    flex-wrap: wrap;
     gap: 8px;
-    justify-content: center;
+    overflow-x: auto;
+    padding: 2px 2px 6px;
+    scrollbar-width: none;
+  }
+  .challengers::-webkit-scrollbar {
+    display: none;
+  }
+  .challengers > :first-child {
+    margin-left: auto;
+  }
+  .challengers > :last-child {
+    margin-right: auto;
+  }
+  .cbtn {
+    flex: 0 0 auto;
+  }
+  /* Short phones: the cassette art gives way to the timeline while players challenge. */
+  @media (max-height: 760px) {
+    .challenging .tape {
+      display: none;
+    }
+    .challenging .deckpanel {
+      grid-template-columns: 1fr;
+      justify-items: center;
+    }
   }
   .cbtn {
     display: inline-flex;

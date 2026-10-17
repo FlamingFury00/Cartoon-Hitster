@@ -46,8 +46,9 @@ class App {
   menuOpen = $state(false);
   private undoStack: GameState[] = [];
   canUndo = $state(false);
-  /** Card whose preview is currently playing (or loading). */
-  private playingCard: string | null = null;
+  /** History entries pushed on top of the home screen (so "home" can unwind them all). */
+  private depth = 0;
+  private unwinding = false;
 
   constructor() {
     this.applySettings();
@@ -57,6 +58,8 @@ class App {
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') player.pause();
       });
+      // Android back button (see MainActivity): the app answers 'exit' only on the home screen.
+      (window as unknown as { sifBack?: () => string }).sifBack = () => this.handleBack();
     }
   }
 
@@ -64,31 +67,54 @@ class App {
 
   go(screen: Screen) {
     if (screen === this.screen) return;
+    const from = this.screen;
     if (screen === 'home') {
       this.screen = 'home';
-      history.replaceState({ screen: 'home' }, '');
+      if (this.depth > 0) {
+        // Drop every screen entry, so that "back" on the home screen leaves the app.
+        this.unwinding = true;
+        history.go(-this.depth);
+        this.depth = 0;
+      }
     } else {
       history.pushState({ screen }, '');
+      this.depth++;
       this.screen = screen;
     }
-    if (screen !== 'game') {
+    if (screen === 'game' && from !== 'game') this.enterGame();
+    else if (screen !== 'game') {
       this.stopMusic();
       keepAwake(false);
     }
   }
 
-  /** Android back button / browser back. In a game it opens the pause menu instead. */
+  /** Browser / Android back. In a game it toggles the pause menu instead of leaving. */
   private onPop(state: { screen?: Screen } | null) {
+    if (this.unwinding) {
+      this.unwinding = false; // our own history.go() back to the home screen
+      return;
+    }
     if (this.screen === 'game' && this.game && this.game.phase.t !== 'over') {
       history.pushState({ screen: 'game' }, '');
       this.menuOpen = !this.menuOpen;
       return;
     }
+    const from = this.screen;
     this.screen = state?.screen ?? 'home';
-    if (this.screen !== 'game') {
+    this.depth = this.screen === 'home' ? 0 : Math.max(0, this.depth - 1);
+    if (this.screen === 'game' && from !== 'game') this.enterGame(); // back from rules / settings
+    else if (this.screen !== 'game') {
       this.stopMusic();
       keepAwake(false);
     }
+  }
+
+  /** Called by the Android back button: 'exit' closes the app. */
+  handleBack(): 'handled' | 'exit' {
+    if (this.screen === 'home') return 'exit';
+    if (this.screen === 'game' && this.game?.phase.t === 'over') this.go('home');
+    else history.back();
+    return 'handled';
   }
 
   back() {
@@ -96,7 +122,6 @@ class App {
   }
 
   private stopMusic() {
-    this.playingCard = null;
     player.stop();
   }
 
@@ -154,8 +179,8 @@ class App {
       this.audioError = null;
       this.menuOpen = false;
       player.unlock();
-      this.go('game');
-      this.enterGame();
+      if (this.screen === 'game') this.enterGame();
+      else this.go('game');
     });
   }
 
@@ -164,12 +189,29 @@ class App {
     player.unlock();
     this.menuOpen = false;
     this.go('game');
-    this.enterGame();
   }
 
+  /** Entering (or coming back to) the game screen: screen on, music of the current card. */
   private enterGame() {
     if (this.settings.keepAwake) keepAwake(true);
+    this.ensureCardMusic();
     this.preloadAhead();
+  }
+
+  /** While a card is being listened to or challenged, its song must be playing (or loading). */
+  private ensureCardMusic() {
+    const g = this.game;
+    if (!g || (g.phase.t !== 'listen' && g.phase.t !== 'challenge')) return;
+    if (this.settings.playback !== 'preview') return; // Spotify mode opens the app only on a draw
+    if (player.songId === g.phase.card && player.state !== 'idle' && player.state !== 'error') return;
+    this.playCard(g.phase.card);
+  }
+
+  /** Play button when nothing is loaded (after an error, or once the song was stopped). */
+  replayCurrent() {
+    const g = this.game;
+    if (!g || (g.phase.t !== 'listen' && g.phase.t !== 'challenge' && g.phase.t !== 'reveal')) return;
+    this.playCard(g.phase.card);
   }
 
   /** Keeps the next cards decoded so a tap starts the music instantly. */
@@ -194,7 +236,6 @@ class App {
       openExternal(spotifyUrl(s));
       return;
     }
-    this.playingCard = card;
     player.play(s).then(
       () => this.preloadAhead(),
       () => {
@@ -353,9 +394,9 @@ class App {
     store.saveGame(prev);
     this.menuOpen = false;
     this.audioError = null;
-    if (prev.phase.t !== 'listen') this.stopMusic();
-    // Undoing a skip brings back the previous song: play it again.
-    else if (this.playingCard !== prev.phase.card) this.playCard(prev.phase.card);
+    if (prev.phase.t === 'intro' || prev.phase.t === 'over') this.stopMusic();
+    // Back to listening or to the challenge (e.g. after undoing a skip): that card's song must play.
+    else this.ensureCardMusic();
     toast('Ultima mossa annullata');
   }
 
@@ -394,6 +435,7 @@ class App {
   private finish(g: GameState) {
     if (g.phase.t !== 'over') return;
     this.revealing = false;
+    this.stopMusic();
     keepAwake(false);
     const winners = g.phase.winners;
     store.addHistory({

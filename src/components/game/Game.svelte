@@ -37,7 +37,7 @@
           · obiettivo {game.settings.target}
         </small>
       </div>
-      {#if app.canUndo && (game.phase.t === 'challenge' || game.phase.t === 'reveal')}
+      {#if app.canUndo && game.phase.t === 'challenge'}
         <button class="icon-btn" aria-label="Annulla l'ultima mossa" onclick={() => app.undo()}><Icon name="undo" /></button>
       {:else}
         <span class="spacer"></span>

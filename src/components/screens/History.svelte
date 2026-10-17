@@ -40,7 +40,7 @@
       <section class="panel">
         <h2>Albo d'oro</h2>
         <ol class="hall">
-          {#each hall as h, i (h.name)}
+          {#each hall as h, i (i)}
             <li style:--pc={h.color}>
               <span class="pos">{['🥇', '🥈', '🥉'][i] ?? `${i + 1}°`}</span>
               <span class="ava">{h.avatar}</span>
@@ -67,7 +67,7 @@
             {/if}
           </p>
           <div class="ps">
-            {#each e.players as p (p.name)}
+            {#each e.players as p, i (i)}
               <span class="pchip" style:--pc={p.color}>{p.avatar} {p.name} {#if e.mode !== 'coop'}<b>{p.cards}</b>{/if}</span>
             {/each}
           </div>
